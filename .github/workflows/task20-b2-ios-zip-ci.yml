@@ -41,6 +41,7 @@ jobs:
         run: |
           set -Eeuo pipefail
           python3 tools/task20_b2_apply_patches.py app
+          python3 tools/task20_b2_fix_flutter_zip_permissions.py app
 
       - name: Install pinned Flutter SDK from official archive
         id: flutter-sdk
