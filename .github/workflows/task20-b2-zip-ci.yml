@@ -1,0 +1,68 @@
+name: Task 20-B2 ZIP Integration
+
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: task20-b2-zip-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  flutter-integration:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955 # v4.3.0
+        with:
+          persist-credentials: false
+
+      - name: Verify and extract implementation package
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          expected="4d6e2f77f4f18d4a9ebc19994da6039ef42d23bd0a38b7790dc1475b0a20e529"
+          actual="$(sha256sum implementation-v0.9.1.zip | awk '{print $1}')"
+          test "$actual" = "$expected"
+          unzip -t implementation-v0.9.1.zip
+          rm -rf app
+          mkdir app
+          unzip -q implementation-v0.9.1.zip -d app
+          test -f app/pubspec.yaml
+          test -f app/FILE_MANIFEST.txt
+
+      - name: Install pinned Flutter SDK from official archive
+        id: flutter-sdk
+        shell: bash
+        run: |
+          mkdir -p app/build/task20_b_logs/flutter
+          python3 app/tools/install_pinned_flutter_sdk.py \
+            --version 3.44.6 \
+            --channel stable \
+            --ref-prefix ee80f08 \
+            --install-root "${RUNNER_TOOL_CACHE}/workout-menu-flutter" \
+            --result-file app/build/task20_b_logs/flutter/flutter_sdk_install.json \
+            --github-output "$GITHUB_OUTPUT"
+          echo "${{ steps.flutter-sdk.outputs.flutter_bin_directory }}" >> "$GITHUB_PATH"
+
+      - name: Run Task 20-B Flutter checks
+        shell: bash
+        working-directory: app
+        run: ./tools/run_task20_b_flutter_checks.sh
+
+      - name: Upload Task 20-B Flutter evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: task20-b2-zip-flutter-evidence-${{ github.run_id }}
+          path: |
+            app/build/task20_b_logs/flutter
+            app/pubspec.lock
+            app/lib/**/*.g.dart
+          if-no-files-found: warn
+          retention-days: 14
