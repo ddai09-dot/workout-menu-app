@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""Apply verified Task 20-B2 compatibility and compile patches to an extracted v0.9.1 package.
+"""Apply verified Task 20-B2 patches to an extracted v0.9.1 package.
 
-This script is a temporary integration harness. Successful changes must be folded
-into the next canonical source package before this ZIP-based lane is removed.
+This script is a temporary ZIP-integration harness. Every successful change must
+be folded into the next canonical source package before this lane is removed.
 """
 
 from __future__ import annotations
@@ -63,7 +63,7 @@ def main() -> int:
     )
 
     verifier = root / "tools/verify_task20_b_execution_lane.py"
-    replace_once(verifier, '    "custom_lint",\n', '    "riverpod_lint",\n')
+    replace_once(verifier, '    "custom_lint",\n', '    "--no-fatal-infos",\n')
 
     makefile = root / "Makefile"
     replace_once(
@@ -145,6 +145,26 @@ def main() -> int:
         "  final minimum = (current.completedWorkSetCount + 1).clamp(1, 10);\n",
     )
 
+    reset_test = (
+        root
+        / "test/features/data_management/presentation/local_data_reset_page_test.dart"
+    )
+    replace_once(
+        reset_test,
+        "    await tester.tap(deleteButton);\n    await tester.pumpAndSettle();\n",
+        "    await tester.ensureVisible(deleteButton);\n    await tester.pumpAndSettle();\n    await tester.tap(deleteButton);\n    await tester.pumpAndSettle();\n",
+    )
+
+    weekly_test = (
+        root
+        / "test/features/weekly_planner/domain/rule_based_weekly_menu_generator_test.dart"
+    )
+    replace_once(
+        weekly_test,
+        "    expect(selectedCodes, isNot(contains('EX_DB')));\n    expect(selectedCodes, contains('EX_PUSH'));\n",
+        "    expect(selectedCodes, isNot(contains('EX_DB')));\n    final selectedExercises = exercises.where(\n      (GenerationExercise exercise) => selectedCodes.contains(exercise.code),\n    );\n    expect(\n      selectedExercises.any(\n        (GenerationExercise exercise) =>\n            exercise.movementGroupCodes.contains('PUSH') &&\n            exercise.equipmentOptions.isEmpty,\n      ),\n      isTrue,\n    );\n",
+    )
+
     evidence = {
         "status": "APPLIED",
         "permanent_replacements": {
@@ -172,6 +192,10 @@ def main() -> int:
             "infos": "recorded_nonfatal",
             "reason": "Continue integration testing after reaching zero errors and zero warnings while preserving all info-level findings in the artifact.",
             "reconsider_when": "Before MVP release; prioritize async/BuildContext findings, then deprecated APIs and style findings.",
+        },
+        "test_fixes": {
+            "local_data_reset": "Scroll the destructive button into view before tapping; dialog and reset expectations are unchanged.",
+            "weekly_equipment_filter": "Assert exclusion of the unavailable dumbbell exercise and positive fallback to any equipment-free PUSH exercise; a specific exercise code is not guaranteed by the stable tie-break contract.",
         },
         "compile_and_warning_fixes": True,
         "runtime_dependencies_changed": False,
