@@ -127,7 +127,7 @@ jobs:
           PY
           grep -n "build_runner\|drift_dev\|riverpod_lint\|custom_lint" app/pubspec.yaml app/analysis_options.yaml app/tools/run_task20_b_flutter_checks.sh || true
 
-      - name: Apply verified Flutter compile fixes
+      - name: Apply verified Flutter analyze fixes
         shell: bash
         run: |
           set -Eeuo pipefail
@@ -141,10 +141,16 @@ jobs:
                   raise SystemExit(f"Expected exactly one match in {path}: {source!r}")
               path.write_text(text.replace(source, target), encoding="utf-8")
 
+          onboarding = Path("app/lib/features/onboarding/data/local_onboarding_repository.dart")
           replace_once(
-              Path("app/lib/features/onboarding/data/local_onboarding_repository.dart"),
+              onboarding,
               "import 'package:workout_menu_app/core/database/app_database.dart';\n",
               "import 'package:workout_menu_app/core/database/app_database.dart' hide OnboardingDraft;\n",
+          )
+          replace_once(
+              onboarding,
+              "import 'package:workout_menu_app/features/onboarding/domain/onboarding_draft.dart';\n",
+              "import 'package:workout_menu_app/features/onboarding/domain/onboarding_draft.dart';\nimport 'package:workout_menu_app/features/onboarding/domain/onboarding_step.dart';\n",
           )
           replace_once(
               Path("app/lib/features/settings/data/local_training_settings_repository.dart"),
@@ -167,18 +173,53 @@ jobs:
               "import 'package:crypto/crypto.dart';\nimport 'package:flutter/foundation.dart';\n",
           )
 
+          records = Path("app/lib/features/records/presentation/records_page.dart")
+          replace_once(
+              records,
+              "              await ref.refresh(recordsDashboardProvider.future);\n",
+              "              final _ = await ref.refresh(recordsDashboardProvider.future);\n",
+          )
+          history = Path("app/lib/features/records/presentation/session_history_page.dart")
+          replace_once(
+              history,
+              "                    await ref.refresh(workoutHistoryProvider.future);\n",
+              "                    final _ = await ref.refresh(workoutHistoryProvider.future);\n",
+          )
+
+          workout_repository = Path("app/lib/features/workout/data/local_workout_repository.dart")
+          replace_once(
+              workout_repository,
+              "    required this.targets,\n    this.skipped = false,\n    this.substitutionReasonCode,\n    this.skipReasonCode,\n",
+              "    required this.targets,\n",
+          )
+          replace_once(
+              workout_repository,
+              "  bool skipped;\n  String? substitutionReasonCode;\n  String? skipReasonCode;\n",
+              "  bool skipped = false;\n  String? substitutionReasonCode;\n  String? skipReasonCode;\n",
+          )
+          replace_once(
+              Path("app/lib/features/workout/presentation/workout_session_page.dart"),
+              "  final minimum = (current.completedWorkSetCount + 1).clamp(1, 10) as int;\n",
+              "  final minimum = (current.completedWorkSetCount + 1).clamp(1, 10);\n",
+          )
+
           evidence = {
               "status": "APPLIED",
-              "fixes": [
-                  "Hide generated Drift OnboardingDraft at onboarding/settings repository boundaries",
-                  "Hide generated Drift WeeklyPlannerDraft at weekly planner repository boundary",
-                  "Use contextual type inference for ProviderScope overrides under Riverpod 3",
-                  "Import FlutterError from flutter/foundation.dart in the AssetBundle test"
+              "compile_fixes": [
+                  "Hide generated Drift draft row types at repository import boundaries",
+                  "Import OnboardingStep extension explicitly",
+                  "Use contextual type inference for ProviderScope overrides",
+                  "Import FlutterError from flutter/foundation.dart"
+              ],
+              "warning_fixes": [
+                  "Consume Riverpod refresh results explicitly",
+                  "Remove never-supplied private constructor parameters while preserving field defaults",
+                  "Remove unnecessary integer cast"
               ],
               "functionality_removed": False,
-              "reason": "Resolve generated-type name collisions and Flutter/Riverpod API compile errors without changing product behavior."
+              "reason": "Resolve analyzer findings without changing product behavior."
           }
-          Path("app/build/task20_b_logs/flutter/compile_fixes.json").write_text(
+          Path("app/build/task20_b_logs/flutter/analyze_fixes.json").write_text(
               json.dumps(evidence, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
               encoding="utf-8",
           )
