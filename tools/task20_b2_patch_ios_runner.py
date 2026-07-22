@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
-"""Patch the Task 20-B iOS runner to remove only Flutter's generated counter test.
+"""Patch the Task 20-B iOS runner to remove only a newly generated scaffold test.
 
-`flutter create --platforms=ios .` may create `test/widget_test.dart`. The file is
-removed only when all known counter-template markers are present. A non-template
-file at the same path causes the CI lane to fail instead of deleting user code.
+The runner records whether `test/widget_test.dart` existed before `flutter create`.
+It deletes the file only when it was absent before creation, exists afterwards,
+and the Flutter creation log explicitly reports that the file was created. Any
+pre-existing or unproven file causes the CI lane to fail instead of deleting it.
 """
 
 from __future__ import annotations
@@ -26,31 +27,34 @@ def main() -> int:
   --project-name workout_menu_app \\
   .
 '''
-    target = source + '''
+    target = '''GENERATED_WIDGET_TEST_PATH="test/widget_test.dart"
+GENERATED_WIDGET_TEST_EXISTED_BEFORE_CREATE=0
+if [[ -e "$GENERATED_WIDGET_TEST_PATH" ]]; then
+  GENERATED_WIDGET_TEST_EXISTED_BEFORE_CREATE=1
+fi
+
+''' + source + '''
 remove_generated_widget_test() {
-  local path="test/widget_test.dart"
+  local path="$GENERATED_WIDGET_TEST_PATH"
+  local create_log="$LOG_DIR/flutter_create_ios.log"
+
+  if [[ "$GENERATED_WIDGET_TEST_EXISTED_BEFORE_CREATE" -ne 0 ]]; then
+    record_gate "remove_generated_widget_test" "FAIL" 1 "Refusing to delete test/widget_test.dart because it existed before flutter create."
+    return 1
+  fi
+
   if [[ ! -f "$path" ]]; then
     record_gate "remove_generated_widget_test" "PASS" 0 "No generated template widget test was present."
     return 0
   fi
 
-  local required_markers=(
-    "A basic Flutter widget test."
-    "await tester.pumpWidget(const MyApp());"
-    "Icons.add"
-    "find.text('0')"
-    "find.text('1')"
-  )
-  local marker
-  for marker in "${required_markers[@]}"; do
-    if ! grep -Fq "$marker" "$path"; then
-      record_gate "remove_generated_widget_test" "FAIL" 1 "Refusing to delete a non-template test/widget_test.dart."
-      return 1
-    fi
-  done
+  if ! grep -Fq "test/widget_test.dart (created)" "$create_log"; then
+    record_gate "remove_generated_widget_test" "FAIL" 1 "Refusing to delete test/widget_test.dart because flutter create did not report creating it."
+    return 1
+  fi
 
   rm "$path"
-  record_gate "remove_generated_widget_test" "PASS" 0 "Removed Flutter-generated counter-app widget test."
+  record_gate "remove_generated_widget_test" "PASS" 0 "Removed widget test proven to have been created by flutter create in this run."
 }
 
 remove_generated_widget_test
