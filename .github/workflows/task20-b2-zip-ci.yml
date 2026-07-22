@@ -41,16 +41,6 @@ jobs:
         run: |
           set -Eeuo pipefail
           python3 tools/task20_b2_apply_patches.py app
-          python3 - <<'PY'
-          from pathlib import Path
-          path = Path("app/tools/verify_task20_b_execution_lane.py")
-          text = path.read_text(encoding="utf-8")
-          source = '    "riverpod_lint",\n'
-          target = '    "--no-fatal-infos",\n'
-          if text.count(source) != 1:
-              raise SystemExit("Expected exactly one temporary riverpod_lint verifier marker")
-          path.write_text(text.replace(source, target), encoding="utf-8")
-          PY
 
       - name: Install pinned Flutter SDK from official archive
         id: flutter-sdk
