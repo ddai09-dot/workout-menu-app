@@ -36,7 +36,7 @@ jobs:
           test -f app/pubspec.yaml
           test -f app/FILE_MANIFEST.txt
 
-      - name: Migrate Riverpod lint to analysis_server_plugin
+      - name: Apply verified dependency compatibility changes
         shell: bash
         run: |
           set -Eeuo pipefail
@@ -54,6 +54,7 @@ jobs:
           pubspec = Path("app/pubspec.yaml")
           replace_once(pubspec, "  custom_lint: ^0.8.1\n", "")
           replace_once(pubspec, "  riverpod_lint: ^3.1.4\n", "")
+          replace_once(pubspec, "  build_runner: ^2.15.2\n", "  build_runner: 2.15.1\n")
 
           analysis = Path("app/analysis_options.yaml")
           replace_once(
@@ -99,18 +100,24 @@ jobs:
 
           evidence = {
               "status": "APPLIED",
-              "decision": "PERMANENT_REPLACEMENT",
-              "removed": ["custom_lint dev dependency", "riverpod_lint pubspec dev dependency", "dart run custom_lint"],
-              "adopted": "analysis_options plugins: riverpod_lint 3.1.4",
-              "reason": "Riverpod 3.1.4 uses the official analysis_server_plugin mechanism; custom_lint is archived and dependency-incompatible.",
+              "permanent_replacements": {
+                  "removed": ["custom_lint dev dependency", "riverpod_lint pubspec dev dependency", "dart run custom_lint"],
+                  "adopted": "analysis_options plugins: riverpod_lint 3.1.4",
+                  "reason": "Riverpod 3.1.4 uses analysis_server_plugin; custom_lint is archived and dependency-incompatible."
+              },
+              "temporary_pins": {
+                  "build_runner": "2.15.1",
+                  "reason": "Flutter 3.44.6 pins meta 1.18.0; build_runner 2.15.2 requires analyzer >=13.3.0 and meta ^1.18.3.",
+                  "reconsider_when": "Flutter SDK permits meta >=1.18.3"
+              },
               "runtime_dependencies_changed": False,
           }
-          Path("app/build/task20_b_logs/flutter/lint_migration.json").write_text(
+          Path("app/build/task20_b_logs/flutter/dependency_compatibility.json").write_text(
               json.dumps(evidence, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
               encoding="utf-8",
           )
           PY
-          grep -n "riverpod_lint\|custom_lint" app/pubspec.yaml app/analysis_options.yaml app/tools/run_task20_b_flutter_checks.sh || true
+          grep -n "build_runner\|riverpod_lint\|custom_lint" app/pubspec.yaml app/analysis_options.yaml app/tools/run_task20_b_flutter_checks.sh || true
 
       - name: Install pinned Flutter SDK from official archive
         id: flutter-sdk
