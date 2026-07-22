@@ -40,15 +40,19 @@ jobs:
         id: flutter-sdk
         shell: bash
         run: |
-          mkdir -p app/build/task20_b_logs/flutter
+          set -Eeuo pipefail
+          result_file="app/build/task20_b_logs/flutter/flutter_sdk_install.json"
+          mkdir -p "$(dirname "$result_file")"
           python3 app/tools/install_pinned_flutter_sdk.py \
             --version 3.44.6 \
             --channel stable \
             --ref-prefix ee80f08 \
             --install-root "${RUNNER_TOOL_CACHE}/workout-menu-flutter" \
-            --result-file app/build/task20_b_logs/flutter/flutter_sdk_install.json \
+            --result-file "$result_file" \
             --github-output "$GITHUB_OUTPUT"
-          echo "${{ steps.flutter-sdk.outputs.flutter_bin_directory }}" >> "$GITHUB_PATH"
+          flutter_bin_directory="$(python3 -c 'import json,sys; from pathlib import Path; print(Path(json.load(open(sys.argv[1], encoding="utf-8"))["flutter_bin"]).parent)' "$result_file")"
+          test -x "$flutter_bin_directory/flutter"
+          echo "$flutter_bin_directory" >> "$GITHUB_PATH"
 
       - name: Run Task 20-B Flutter checks
         shell: bash
