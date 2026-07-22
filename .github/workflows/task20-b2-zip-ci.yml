@@ -36,6 +36,38 @@ jobs:
           test -f app/pubspec.yaml
           test -f app/FILE_MANIFEST.txt
 
+      - name: Apply verified lint dependency compatibility patch
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          mkdir -p app/build/task20_b_logs/flutter
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          path = Path("app/pubspec.yaml")
+          text = path.read_text(encoding="utf-8")
+          source = "  riverpod_lint: ^3.1.4\n"
+          target = "  riverpod_lint: 3.1.3\n"
+          if text.count(source) != 1:
+              raise SystemExit("Expected exactly one riverpod_lint ^3.1.4 entry")
+          path.write_text(text.replace(source, target), encoding="utf-8")
+          evidence = {
+              "status": "APPLIED",
+              "package": "riverpod_lint",
+              "from": "^3.1.4",
+              "to": "3.1.3",
+              "reason": "custom_lint 0.8.1 requires analyzer_plugin ^0.13.0 while riverpod_lint 3.1.4 requires ^0.14.0",
+              "scope": "dev_dependency_only",
+              "temporary": True,
+          }
+          Path("app/build/task20_b_logs/flutter/dependency_patch.json").write_text(
+              json.dumps(evidence, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
+              encoding="utf-8",
+          )
+          PY
+          grep -n "riverpod_lint" app/pubspec.yaml
+
       - name: Install pinned Flutter SDK from official archive
         id: flutter-sdk
         shell: bash
