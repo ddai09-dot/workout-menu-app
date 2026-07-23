@@ -24,51 +24,25 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Verify and extract implementation package
+      - name: Verify and extract canonical implementation package
         shell: bash
         run: |
           set -Eeuo pipefail
-          expected="4d6e2f77f4f18d4a9ebc19994da6039ef42d23bd0a38b7790dc1475b0a20e529"
-          actual="$(shasum -a 256 implementation-v0.9.1.zip | awk '{print $1}')"
+          expected="b35f8f15740fb0e30979bed4eb836fd315d466bb0bd489fc5c70b5749535cf98"
+          actual="$(shasum -a 256 implementation-v0.9.2.zip | awk '{print $1}')"
           test "$actual" = "$expected"
-          unzip -t implementation-v0.9.1.zip
+          unzip -t implementation-v0.9.2.zip
           rm -rf app
           mkdir app
-          unzip -q implementation-v0.9.1.zip -d app
+          unzip -q implementation-v0.9.2.zip -d app
           test -f app/pubspec.yaml
           test -f app/FILE_MANIFEST.txt
 
-      - name: Apply verified Task 20-B2 patches
+      - name: Verify Task 20-C5 canonical package
         shell: bash
         run: |
           set -Eeuo pipefail
-          python3 tools/task20_b2_apply_patches.py app
-          python3 tools/task20_b2_fix_flutter_zip_permissions.py app
-          python3 tools/task20_b2_patch_ios_runner.py app
-
-      - name: Apply Task 20-C1 analyzer fixes
-        shell: bash
-        run: |
-          set -Eeuo pipefail
-          python3 tools/task20_c1_apply_analyzer_fixes.py app
-
-      - name: Apply Task 20-C2 deprecated API fixes
-        shell: bash
-        run: |
-          set -Eeuo pipefail
-          python3 tools/task20_c2_apply_deprecated_api_fixes.py app
-
-      - name: Apply Task 20-C3 style and strict analyzer fixes
-        shell: bash
-        run: |
-          set -Eeuo pipefail
-          python3 tools/task20_c3_apply_style_and_gate.py app
-
-      - name: Apply Task 20-C4 dependency update trial
-        shell: bash
-        run: |
-          set -Eeuo pipefail
-          python3 tools/task20_c4_try_dependency_updates.py app
+          python3 tools/task20_c5_verify_canonical_package.py app
 
       - name: Install pinned Flutter SDK from official archive
         id: flutter-sdk
