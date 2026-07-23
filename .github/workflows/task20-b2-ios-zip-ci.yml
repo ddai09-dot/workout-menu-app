@@ -46,6 +46,12 @@ jobs:
           python3 tools/task20_b2_fix_flutter_zip_permissions.py app
           python3 tools/task20_b2_patch_ios_runner.py app
 
+      - name: Apply Task 20-C1 analyzer fixes
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          python3 tools/task20_c1_apply_analyzer_fixes.py app
+
       - name: Install pinned Flutter SDK from official archive
         id: flutter-sdk
         shell: bash
@@ -68,6 +74,13 @@ jobs:
         shell: bash
         working-directory: app
         run: ./tools/run_task20_b_ios_simulator.sh
+
+      - name: Verify Task 20-C1 analyzer findings
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          python3 tools/task20_c1_verify_analyzer_findings.py \
+            app/build/task20_b_logs/flutter/flutter_analyze.log
 
       - name: Upload Task 20-B iOS evidence
         if: always()
