@@ -13,16 +13,19 @@ Replace the temporary multi-stage ZIP patch lane with a new canonical source pac
 
 The package was generated deterministically from the v0.9.1 canonical source after applying the already merged and verified B2/B3/C1-C4 changes. Its file manifest was regenerated, the ZIP integrity test passed, and the re-extracted package passed the project consistency verifier before publication.
 
+Because the connected repository write interface accepts text but not binary contents, the exact ZIP bytes are stored as six immutable Base64 parts named `implementation-v0.9.2.zip.b64.part00` through `part05`. Both workflows reconstruct the ZIP before any validation and require the reconstructed bytes to match the SHA-256 above. This is a transport representation only; no source patch is applied after extraction.
+
 ## Workflow change
 
 The Linux and macOS workflows now:
 
-1. verify and extract the v0.9.2 canonical package;
-2. verify that the package already contains B2/B3/C1-C4;
-3. install the pinned official Flutter SDK;
-4. run the existing Flutter or iOS Simulator validation lane;
-5. verify the strict analyzer gate and dependency resolution;
-6. upload evidence.
+1. reconstruct the exact v0.9.2 ZIP from the six immutable transport parts;
+2. verify SHA-256 and ZIP integrity, then extract it;
+3. verify that the package already contains B2/B3/C1-C4;
+4. install the pinned official Flutter SDK;
+5. run the existing Flutter or iOS Simulator validation lane;
+6. verify the strict analyzer gate and dependency resolution;
+7. upload evidence.
 
 They no longer execute the temporary B2, C1, C2, C3, or C4 patch-application scripts after extraction.
 
@@ -32,6 +35,7 @@ They no longer execute the temporary B2, C1, C2, C3, or C4 patch-application scr
 
 - `implementation-v0.9.2.zip` as the next canonical implementation package.
 - Direct validation of the canonical package without post-extraction source mutation.
+- Segmented Base64 only as the repository transport representation of the exact ZIP bytes.
 
 ### Temporarily retain
 
@@ -46,8 +50,9 @@ Historical packages and patch scripts are not deleted in Task20-C5. A separate c
 
 ## Acceptance conditions
 
-Task20-C5 can be merged only when both PR lanes pass directly from v0.9.2:
+Task20-C5 can be merged only when both PR lanes pass directly from the reconstructed v0.9.2 package:
 
+- Base64 part count and decoding
 - SHA-256 and ZIP integrity
 - canonical-package verifier
 - Flutter 3.44.6 official SDK verification
