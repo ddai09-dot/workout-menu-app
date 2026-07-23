@@ -80,7 +80,7 @@ jobs:
         run: |
           set -Eeuo pipefail
           python3 tools/task20_c1_verify_analyzer_findings.py \
-            app/build/task20_b_logs/flutter/flutter_analyze.log
+            app/build/task20_b_logs/ios/flutter_checks/flutter_analyze.log
 
       - name: Upload Task 20-B iOS evidence
         if: always()
