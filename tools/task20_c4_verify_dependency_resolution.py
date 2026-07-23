@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Verify Task 20-C4 resolved versions after removing temporary pins."""
+"""Verify Task 20-C4 isolated drift_dev resolution."""
 
 from __future__ import annotations
 
@@ -40,38 +40,42 @@ def main() -> int:
         raise SystemExit("pubspec.yaml or pubspec.lock was not found")
 
     pubspec = pubspec_path.read_text(encoding="utf-8")
-    if "  build_runner: ^2.15.2\n" not in pubspec:
-        raise SystemExit("build_runner update constraint was not applied")
+    if "  build_runner: 2.15.1\n" not in pubspec:
+        raise SystemExit("Required build_runner 2.15.1 compatibility pin is missing")
+    if "  build_runner: ^2.15.2\n" in pubspec:
+        raise SystemExit("Incompatible build_runner trial constraint remains")
     if "  drift_dev: ^2.34.4\n" not in pubspec:
         raise SystemExit("drift_dev update constraint was not applied")
-    if "  build_runner: 2.15.1\n" in pubspec or "  drift_dev: 2.34.0\n" in pubspec:
-        raise SystemExit("A temporary exact dependency pin remains in pubspec.yaml")
+    if "  drift_dev: 2.34.0\n" in pubspec:
+        raise SystemExit("The drift_dev exact pin remains in pubspec.yaml")
 
     lock_text = lock_path.read_text(encoding="utf-8")
     resolved = {
         "build_runner": package_version(lock_text, "build_runner"),
         "drift_dev": package_version(lock_text, "drift_dev"),
     }
-    minimum = {
-        "build_runner": (2, 15, 2),
-        "drift_dev": (2, 34, 4),
-    }
-    for package, value in resolved.items():
-        if parse_version(value) < minimum[package]:
-            raise SystemExit(
-                f"{package} resolved below the trial minimum: {value} < "
-                f"{'.'.join(map(str, minimum[package]))}"
-            )
+    if resolved["build_runner"] != "2.15.1":
+        raise SystemExit(
+            "build_runner resolved away from required compatibility version: "
+            + resolved["build_runner"]
+        )
+    if parse_version(resolved["drift_dev"]) < (2, 34, 4):
+        raise SystemExit(
+            "drift_dev resolved below the trial minimum: "
+            + resolved["drift_dev"]
+            + " < 2.34.4"
+        )
 
     result = {
         "status": "PASS",
         "task": "Task 20-C4",
         "constraints": {
-            "build_runner": "^2.15.2",
+            "build_runner": "2.15.1",
             "drift_dev": "^2.34.4",
         },
         "resolved": resolved,
-        "temporary_exact_pins_removed": True,
+        "build_runner_pin_retained": True,
+        "drift_dev_exact_pin_removed": True,
     }
     output = lock_path.parent / "build/task20_b_logs/flutter/task20_c4_dependency_result.json"
     output.parent.mkdir(parents=True, exist_ok=True)
