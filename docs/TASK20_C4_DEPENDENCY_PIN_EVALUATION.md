@@ -15,7 +15,31 @@ Result: **FAIL**
 
 - Flutter run: #34
 - iOS run: #21
-- stopped step: `Run Task 20-B Flutter checks` / shared Flutter checks
+- stopped step: shared Flutter checks
+- stopped sub-step: `flutter_pub_get`
+- exit code: 1
+
+Cause:
+
+`build_runner >=2.15.2` requires `meta ^1.18.3`, while Flutter 3.44.6 pins `meta 1.18.0`.
+
+Decision:
+
+- Retain the exact `build_runner 2.15.1` compatibility pin.
+- Test `drift_dev` separately.
+
+## Attempt 2 — drift_dev 2.34.4 or later
+
+Trial changes:
+
+- retain `build_runner: 2.15.1`
+- `drift_dev: 2.34.0` → `drift_dev: ^2.34.4`
+
+Result: **FAIL**
+
+- Flutter run: #37
+- iOS run: #24
+- stopped step: shared Flutter checks
 - stopped sub-step: `flutter_pub_get`
 - exit code: 1
 - Drift generation: not run
@@ -23,27 +47,27 @@ Result: **FAIL**
 - Flutter Test: not run
 - iOS Simulator build: not run
 
-Solver cause:
+Cause:
 
-`build_runner >=2.15.2` requires `meta ^1.18.3`, while Flutter 3.44.6 pins `meta 1.18.0`. Therefore `build_runner ^2.15.2` is incompatible with the pinned Flutter SDK.
+`drift_dev >=2.34.1+1` requires `analyzer ^13.0.0`. Under the current dependency graph, Flutter Test pins `matcher 0.12.19` and `test_api 0.7.11`; Supabase requires `web_socket_channel ^3.0.0`; Riverpod requires `test ^1.0.0`. These constraints are incompatible with `drift_dev >=2.34.1+1`.
 
 Decision:
 
-- Retain the exact `build_runner 2.15.1` compatibility pin.
-- Do not interpret the failed joint trial as evidence about `drift_dev 2.34.4`, because dependency solving stopped first on the `build_runner` conflict.
+- Do not require `drift_dev 2.34.4` or later under Flutter 3.44.6.
+- Test whether the exact pin can be replaced with the compatible range `^2.34.0`, which should resolve to 2.34.0 under the current graph.
 
-## Attempt 2 — isolated drift_dev update
+## Attempt 3 — compatible drift_dev range
 
 Trial changes:
 
 - retain `build_runner: 2.15.1`
-- `drift_dev: 2.34.0` → `drift_dev: ^2.34.4`
+- `drift_dev: 2.34.0` → `drift_dev: ^2.34.0`
 
-This isolated trial determines whether only the `drift_dev` exact pin can be removed.
+The exact `drift_dev` pin may be removed only if the current dependency graph resolves to the verified compatible version 2.34.0 and all validation lanes pass.
 
 ## Acceptance conditions
 
-The isolated change is eligible for merge only when both Linux and macOS lanes pass all of the following:
+Both Linux and macOS lanes must pass:
 
 1. Flutter 3.44.6 official SDK verification
 2. `flutter pub get`
@@ -57,21 +81,13 @@ The isolated change is eligible for merge only when both Linux and macOS lanes p
 
 The verifier must confirm:
 
-- `build_runner` remains exactly `2.15.1`
-- `drift_dev` constraint is `^2.34.4`
-- resolved `drift_dev` is at least `2.34.4`
+- `build_runner` constraint and resolution remain exactly `2.15.1`
+- `drift_dev` constraint is `^2.34.0`
+- resolved `drift_dev` is exactly `2.34.0`
 
 ## Failure policy
 
 A dependency resolution, generation, analyzer, test, or iOS build failure means the relevant exact pin remains in place. The PR must not be merged merely to remove a temporary pin.
-
-Any failure record must include:
-
-- stopped step
-- exit code
-- dependency solver message or generated-source difference
-- correction or reason for retaining the pin
-- rerun result, when a safe correction exists
 
 ## Scope
 
