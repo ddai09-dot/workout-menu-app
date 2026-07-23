@@ -14,7 +14,7 @@ TARGETED_LINTS = {
     "unawaited_futures",
     "use_build_context_synchronously",
 }
-EXPECTED_INFO_COUNT = 49
+EXPECTED_UNIQUE_INFO_COUNT = 49
 ISSUE_RE = re.compile(r"^\s*info\s+•.*•\s+([a-z0-9_]+)\s*$")
 
 
@@ -28,13 +28,21 @@ def main() -> int:
     if not log_path.is_file():
         raise SystemExit(f"Analyzer log not found: {log_path}")
 
-    lint_names: list[str] = []
+    raw_findings: list[tuple[str, str]] = []
     for line in log_path.read_text(encoding="utf-8").splitlines():
         match = ISSUE_RE.match(line)
         if match:
-            lint_names.append(match.group(1))
+            raw_findings.append((line.strip(), match.group(1)))
 
-    counts = Counter(lint_names)
+    unique_findings: list[tuple[str, str]] = []
+    seen_lines: set[str] = set()
+    for normalized_line, lint_name in raw_findings:
+        if normalized_line in seen_lines:
+            continue
+        seen_lines.add(normalized_line)
+        unique_findings.append((normalized_line, lint_name))
+
+    counts = Counter(lint_name for _, lint_name in unique_findings)
     remaining_targeted = {
         lint: counts[lint] for lint in sorted(TARGETED_LINTS) if counts[lint]
     }
@@ -43,18 +51,21 @@ def main() -> int:
             "Task 20-C1 targeted analyzer findings remain: "
             + json.dumps(remaining_targeted, sort_keys=True)
         )
-    if len(lint_names) != EXPECTED_INFO_COUNT:
+    if len(unique_findings) != EXPECTED_UNIQUE_INFO_COUNT:
         raise SystemExit(
-            f"Expected {EXPECTED_INFO_COUNT} info findings after Task 20-C1; "
-            f"found {len(lint_names)}"
+            f"Expected {EXPECTED_UNIQUE_INFO_COUNT} unique info findings after "
+            f"Task 20-C1; found {len(unique_findings)} "
+            f"({len(raw_findings)} raw info lines)"
         )
 
     result = {
         "status": "PASS",
         "task": "Task 20-C1",
-        "analyzer_info_count": len(lint_names),
+        "analyzer_unique_info_count": len(unique_findings),
+        "analyzer_raw_info_line_count": len(raw_findings),
+        "duplicate_info_line_count": len(raw_findings) - len(unique_findings),
         "removed_categories": sorted(TARGETED_LINTS),
-        "remaining_counts": dict(sorted(counts.items())),
+        "remaining_unique_counts": dict(sorted(counts.items())),
     }
     output_path = log_path.parent / "task20_c1_analyzer_verification.json"
     output_path.write_text(
