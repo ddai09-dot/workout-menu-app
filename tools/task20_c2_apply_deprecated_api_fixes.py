@@ -37,47 +37,34 @@ def main() -> int:
         "      publishableKey: environment.supabasePublishableKey,\n",
     )
 
-    # DropdownButtonFormField.value was only an alias for FormField.initialValue.
-    dropdown_files = {
-        root / "lib/features/weekly_planner/presentation/steps/weekly_planner_steps.dart": 6,
-        root / "lib/features/workout/presentation/workout_adjustment_page.dart": 2,
-        root / "lib/features/workout/presentation/workout_assessment_page.dart": 3,
-        root / "lib/features/workout/presentation/workout_session_page.dart": 2,
-    }
-    for path, expected in dropdown_files.items():
-        text = path.read_text(encoding="utf-8")
-        marker = "DropdownButtonFormField"
-        if text.count(marker) < expected:
-            raise SystemExit(
-                f"Expected at least {expected} DropdownButtonFormField occurrences in {path}"
-            )
-        lines = text.splitlines(keepends=True)
-        remaining = expected
-        inside_dropdown = False
-        depth = 0
-        output: list[str] = []
-        for line in lines:
-            if marker in line:
-                inside_dropdown = True
-                depth = line.count("(") - line.count(")")
-                output.append(line)
-                continue
-            if inside_dropdown:
-                stripped = line.lstrip()
-                if remaining > 0 and stripped.startswith("value:"):
-                    indent = line[: len(line) - len(stripped)]
-                    line = indent + "initialValue:" + stripped[len("value:") :]
-                    remaining -= 1
-                depth += line.count("(") - line.count(")")
-                if depth <= 0:
-                    inside_dropdown = False
-            output.append(line)
-        if remaining != 0:
-            raise SystemExit(
-                f"Expected {expected} DropdownButtonFormField value arguments in {path}; "
-                f"replaced {expected - remaining}"
-            )
-        path.write_text("".join(output), encoding="utf-8")
+    weekly = root / "lib/features/weekly_planner/presentation/steps/weekly_planner_steps.dart"
+    for source, target in (
+        (
+            "            value: draft.increaseMethodCode,\n",
+            "            initialValue: draft.increaseMethodCode,\n",
+        ),
+        (
+            "          value: draft.splitOverrideCode ?? 'DEFAULT',\n",
+            "          initialValue: draft.splitOverrideCode ?? 'DEFAULT',\n",
+        ),
+        (
+            "                      value: day.durationMin,\n",
+            "                      initialValue: day.durationMin,\n",
+        ),
+        (
+            "                      value: locations.any((value) => value.id == day.locationId)\n",
+            "                      initialValue: locations.any((value) => value.id == day.locationId)\n",
+        ),
+        (
+            "                value: value!.actionCode,\n",
+            "                initialValue: value!.actionCode,\n",
+        ),
+        (
+            "                value: value!.adjustmentCode,\n",
+            "                initialValue: value!.adjustmentCode,\n",
+        ),
+    ):
+        replace_count(weekly, source, target)
 
     adjustment = root / "lib/features/workout/presentation/workout_adjustment_page.dart"
     replace_count(
@@ -105,6 +92,47 @@ def main() -> int:
                   ),
 """,
     )
+    for source, target in (
+        (
+            "                    value: bodyPart,\n",
+            "                    initialValue: bodyPart,\n",
+        ),
+        (
+            "                    value: actionCode,\n",
+            "                    initialValue: actionCode,\n",
+        ),
+    ):
+        replace_count(adjustment, source, target)
+
+    assessment = root / "lib/features/workout/presentation/workout_assessment_page.dart"
+    for source, target in (
+        (
+            "                          value: _painBodyPartId,\n",
+            "                          initialValue: _painBodyPartId,\n",
+        ),
+        (
+            "                      value: _painExerciseId,\n",
+            "                      initialValue: _painExerciseId,\n",
+        ),
+        (
+            "                      value: _incompleteReason,\n",
+            "                      initialValue: _incompleteReason,\n",
+        ),
+    ):
+        replace_count(assessment, source, target)
+
+    session = root / "lib/features/workout/presentation/workout_session_page.dart"
+    for source, target in (
+        (
+            "                  value: part,\n",
+            "                  initialValue: part,\n",
+        ),
+        (
+            "                  value: action,\n",
+            "                  initialValue: action,\n",
+        ),
+    ):
+        replace_count(session, source, target)
 
     evidence_dir = root / "build/task20_b_logs/flutter"
     evidence_dir.mkdir(parents=True, exist_ok=True)
