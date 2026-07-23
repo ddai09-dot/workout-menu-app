@@ -58,6 +58,12 @@ jobs:
           set -Eeuo pipefail
           python3 tools/task20_c2_apply_deprecated_api_fixes.py app
 
+      - name: Apply Task 20-C3 style and strict analyzer fixes
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          python3 tools/task20_c3_apply_style_and_gate.py app
+
       - name: Install pinned Flutter SDK from official archive
         id: flutter-sdk
         shell: bash
@@ -81,12 +87,13 @@ jobs:
         working-directory: app
         run: ./tools/run_task20_b_ios_simulator.sh
 
-      - name: Verify Task 20-C1/C2 analyzer findings
+      - name: Verify Task 20-C3 clean analyzer gate
         shell: bash
         run: |
           set -Eeuo pipefail
-          python3 tools/task20_c2_verify_analyzer_findings.py \
-            app/build/task20_b_logs/ios/flutter_checks/flutter_analyze.log
+          python3 tools/task20_c3_verify_analyzer_clean.py \
+            app/build/task20_b_logs/ios/flutter_checks/flutter_analyze.log \
+            app/tools/run_task20_b_flutter_checks.sh
 
       - name: Upload Task 20-B iOS evidence
         if: always()
