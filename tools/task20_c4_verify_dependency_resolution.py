@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Verify Task 20-C4 isolated drift_dev resolution."""
+"""Verify Task 20-C4 compatible dependency resolution."""
 
 from __future__ import annotations
 
@@ -7,13 +7,6 @@ import json
 import re
 import sys
 from pathlib import Path
-
-
-def parse_version(value: str) -> tuple[int, ...]:
-    match = re.match(r"^(\d+(?:\.\d+)*)", value)
-    if match is None:
-        raise SystemExit(f"Unsupported version string: {value}")
-    return tuple(int(part) for part in match.group(1).split("."))
 
 
 def package_version(lock_text: str, package: str) -> str:
@@ -44,10 +37,12 @@ def main() -> int:
         raise SystemExit("Required build_runner 2.15.1 compatibility pin is missing")
     if "  build_runner: ^2.15.2\n" in pubspec:
         raise SystemExit("Incompatible build_runner trial constraint remains")
-    if "  drift_dev: ^2.34.4\n" not in pubspec:
-        raise SystemExit("drift_dev update constraint was not applied")
+    if "  drift_dev: ^2.34.0\n" not in pubspec:
+        raise SystemExit("Compatible drift_dev range was not applied")
     if "  drift_dev: 2.34.0\n" in pubspec:
         raise SystemExit("The drift_dev exact pin remains in pubspec.yaml")
+    if "  drift_dev: ^2.34.4\n" in pubspec:
+        raise SystemExit("Incompatible drift_dev trial constraint remains")
 
     lock_text = lock_path.read_text(encoding="utf-8")
     resolved = {
@@ -59,11 +54,10 @@ def main() -> int:
             "build_runner resolved away from required compatibility version: "
             + resolved["build_runner"]
         )
-    if parse_version(resolved["drift_dev"]) < (2, 34, 4):
+    if resolved["drift_dev"] != "2.34.0":
         raise SystemExit(
-            "drift_dev resolved below the trial minimum: "
+            "drift_dev did not resolve to the verified compatible version 2.34.0: "
             + resolved["drift_dev"]
-            + " < 2.34.4"
         )
 
     result = {
@@ -71,11 +65,11 @@ def main() -> int:
         "task": "Task 20-C4",
         "constraints": {
             "build_runner": "2.15.1",
-            "drift_dev": "^2.34.4",
+            "drift_dev": "^2.34.0",
         },
         "resolved": resolved,
-        "build_runner_pin_retained": True,
-        "drift_dev_exact_pin_removed": True,
+        "build_runner_exact_pin_retained": True,
+        "drift_dev_exact_pin_replaced_by_compatible_range": True,
     }
     output = lock_path.parent / "build/task20_b_logs/flutter/task20_c4_dependency_result.json"
     output.parent.mkdir(parents=True, exist_ok=True)
