@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Evaluate removal of the Task 20-B2 dependency pins."""
+"""Evaluate removal of the Task 20-B2 drift_dev pin."""
 
 from __future__ import annotations
 
@@ -28,7 +28,9 @@ def main() -> int:
     if not pubspec.is_file():
         raise SystemExit(f"pubspec.yaml not found under {root}")
 
-    replace_once(pubspec, "  build_runner: 2.15.1\n", "  build_runner: ^2.15.2\n")
+    text = pubspec.read_text(encoding="utf-8")
+    if "  build_runner: 2.15.1\n" not in text:
+        raise SystemExit("Required build_runner 2.15.1 compatibility pin is missing")
     replace_once(pubspec, "  drift_dev: 2.34.0\n", "  drift_dev: ^2.34.4\n")
 
     evidence_dir = root / "build/task20_b_logs/flutter"
@@ -36,14 +38,23 @@ def main() -> int:
     evidence = {
         "status": "APPLIED",
         "task": "Task 20-C4",
-        "purpose": "Evaluate removal of temporary dependency pins",
-        "previous": {
-            "build_runner": "2.15.1",
-            "drift_dev": "2.34.0",
+        "purpose": "Evaluate isolated removal of the drift_dev temporary pin",
+        "attempt_1": {
+            "result": "FAIL",
+            "build_runner_requested": "^2.15.2",
+            "drift_dev_requested": "^2.34.4",
+            "stopped_step": "flutter_pub_get",
+            "exit_code": 1,
+            "cause": (
+                "build_runner >=2.15.2 requires meta ^1.18.3, while Flutter "
+                "3.44.6 pins meta 1.18.0"
+            ),
+            "decision": "retain build_runner 2.15.1 exact pin",
         },
-        "requested": {
-            "build_runner": "^2.15.2",
-            "drift_dev": "^2.34.4",
+        "attempt_2": {
+            "build_runner": "2.15.1",
+            "drift_dev_previous": "2.34.0",
+            "drift_dev_requested": "^2.34.4",
         },
         "merge_policy": (
             "Merge only if dependency resolution, Drift generation, strict analyze, "
