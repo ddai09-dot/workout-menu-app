@@ -62,6 +62,12 @@ jobs:
           set -Eeuo pipefail
           python3 tools/task20_c3_apply_style_and_gate.py app
 
+      - name: Apply Task 20-C4 dependency update trial
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          python3 tools/task20_c4_try_dependency_updates.py app
+
       - name: Install pinned Flutter SDK from official archive
         id: flutter-sdk
         shell: bash
@@ -93,6 +99,13 @@ jobs:
             app/build/task20_b_logs/flutter/flutter_analyze.log \
             app/tools/run_task20_b_flutter_checks.sh
 
+      - name: Verify Task 20-C4 dependency resolution
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          python3 tools/task20_c4_verify_dependency_resolution.py \
+            app/pubspec.yaml app/pubspec.lock
+
       - name: Upload Task 20-B Flutter evidence
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
@@ -100,6 +113,7 @@ jobs:
           name: task20-b2-zip-flutter-evidence-${{ github.run_id }}
           path: |
             app/build/task20_b_logs/flutter
+            app/pubspec.yaml
             app/pubspec.lock
             app/lib/**/*.g.dart
           if-no-files-found: warn
