@@ -103,10 +103,17 @@ void main() {
 
       await _tapText(tester, 'マイページ');
       await _waitForText(tester, 'トレーニング設定');
+      await _scrollUntilTextVisible(tester, '端末内データ');
       await _tapText(tester, '端末内データ');
       await _waitForText(tester, '端末内データを初期化');
-      expect(find.text('削除されるもの'), findsOneWidget);
+      await _waitForText(tester, '削除されるもの');
+      await _scrollUntilTextVisible(tester, '削除されないもの');
       expect(find.text('削除されないもの'), findsOneWidget);
+      await _scrollUntilTextVisible(
+        tester,
+        '削除したデータは元に戻せないことを確認しました',
+      );
+      await _scrollUntilTextVisible(tester, '端末内データを削除');
 
       final resetButton =
           find.widgetWithText(FilledButton, '端末内データを削除');
@@ -163,6 +170,29 @@ Future<void> _waitForSavingToFinish(WidgetTester tester) async {
     }
   }
   throw TestFailure('Timed out waiting for the onboarding save queue.');
+}
+
+Future<void> _scrollUntilTextVisible(
+  WidgetTester tester,
+  String text, {
+  int maxScrolls = 12,
+}) async {
+  final target = find.text(text);
+  for (var attempt = 0; attempt <= maxScrolls; attempt += 1) {
+    await tester.pump(const Duration(milliseconds: 250));
+    if (target.evaluate().isNotEmpty) {
+      await tester.ensureVisible(target.first);
+      await tester.pump(const Duration(milliseconds: 250));
+      return;
+    }
+    final listViews = find.byType(ListView);
+    if (listViews.evaluate().isEmpty) {
+      throw TestFailure('No ListView available while scrolling for: $text');
+    }
+    await tester.drag(listViews.first, const Offset(0, -500));
+    await tester.pump(const Duration(milliseconds: 400));
+  }
+  throw TestFailure('Timed out scrolling to text: $text');
 }
 
 Future<void> _tapText(WidgetTester tester, String text) async {
