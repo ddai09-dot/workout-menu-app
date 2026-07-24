@@ -23,12 +23,26 @@ def main() -> int:
             raise SystemExit(f"test overlay source not found: {source}")
 
     text = pubspec.read_text(encoding="utf-8")
-    dependency = "  integration_test:\n    sdk: flutter\n"
-    if dependency not in text:
-        anchor = "  flutter_test:\n    sdk: flutter\n"
-        if text.count(anchor) != 1:
-            raise SystemExit("expected exactly one flutter_test SDK dependency")
-        text = text.replace(anchor, anchor + dependency, 1)
+    anchor = "  flutter_test:\n    sdk: flutter\n"
+    if text.count(anchor) != 1:
+        raise SystemExit("expected exactly one flutter_test SDK dependency")
+
+    dependencies = (
+        "  integration_test:\n"
+        "    sdk: flutter\n"
+        "  flutter_driver:\n"
+        "    sdk: flutter\n"
+    )
+    missing = [
+        dependency
+        for dependency in (
+            "  integration_test:\n    sdk: flutter\n",
+            "  flutter_driver:\n    sdk: flutter\n",
+        )
+        if dependency not in text
+    ]
+    if missing:
+        text = text.replace(anchor, anchor + "".join(missing), 1)
         pubspec.write_text(text, encoding="utf-8")
 
     integration_dir = app_dir / "integration_test"
