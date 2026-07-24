@@ -8,10 +8,10 @@ Replace the temporary multi-stage ZIP patch validation lane with a new canonical
 
 - Package: `implementation-v0.9.2.zip`
 - Application version: `0.9.2+20`
-- SHA-256: `b35f8f15740fb0e30979bed4eb836fd315d466bb0bd489fc5c70b5749535cf98`
+- SHA-256: `322aa363bbd3f2cccc8c615e56975c4c4c5c0ab7b1ac772c4eae20a4536099f3`
 - Schema: v9 / 75 tables, unchanged
 
-The candidate was generated deterministically from the verified v0.9.1 canonical source. The integration input is an immutable compressed patch payload stored in four text parts. The promotion builder applies that payload once to v0.9.1, removes transient build directories, writes a deterministic ZIP, and requires the exact SHA-256 above.
+The candidate is generated deterministically from the verified v0.9.1 canonical source. The integration input is an immutable compressed patch payload stored in four text parts. The promotion builder applies that payload once to v0.9.1, normalizes the iOS validation order, removes transient build directories, writes a deterministic ZIP, and requires the exact SHA-256 above.
 
 Both workflows then delete the promotion worktree, re-extract the generated v0.9.2 ZIP, and perform all acceptance validation against that re-extracted package. No B2, C1, C2, C3, or C4 patch is applied to the v0.9.2 validation source after extraction.
 
@@ -30,6 +30,22 @@ The Linux and macOS workflows now:
 9. upload the generated v0.9.2 ZIP and validation evidence.
 
 The former five post-extraction patch-application steps are removed from the validation lane.
+
+For the iOS lane, common Flutter verification is executed before `flutter create --platforms=ios`. This preserves exact canonical-package manifest verification before Flutter legitimately generates platform files. The generated iOS project is then built and validated separately.
+
+## Initial iOS failure and correction
+
+Initial PR run #30 generated and verified v0.9.2 successfully, but stopped during `common_flutter_checks` with exit code 2. `flutter create` had generated iOS platform files before `make verify`, so `verify_project_consistency.py` correctly reported that `FILE_MANIFEST.txt` no longer matched the canonical package.
+
+Correction:
+
+- retain exact manifest verification;
+- move common Flutter checks before `flutter create`;
+- generate the iOS platform only after canonical-source verification;
+- continue to guard deletion of a newly generated template `test/widget_test.dart`;
+- build the unsigned iOS Simulator application after generation.
+
+The manifest rule was not weakened, and no generated platform files were added to the canonical source merely to satisfy the verifier.
 
 ## Classification
 
