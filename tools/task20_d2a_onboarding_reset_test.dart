@@ -166,7 +166,7 @@ Future<void> _waitForSavingToFinish(WidgetTester tester) async {
 }
 
 Future<void> _tapText(WidgetTester tester, String text) async {
-  await _tapFinder(tester, find.text(text).first, description: text);
+  await _tapFinder(tester, find.text(text), description: text);
 }
 
 Future<void> _tapTextAt(WidgetTester tester, String text, int index) async {
@@ -189,7 +189,7 @@ Future<void> _tapTextAt(WidgetTester tester, String text, int index) async {
 Future<void> _tapTooltip(WidgetTester tester, String tooltip) async {
   await _tapFinder(
     tester,
-    find.byTooltip(tooltip).first,
+    find.byTooltip(tooltip),
     description: 'tooltip:$tooltip',
   );
 }
@@ -203,9 +203,10 @@ Future<void> _tapFinder(
   while (DateTime.now().isBefore(deadline)) {
     await tester.pump(const Duration(milliseconds: 250));
     if (finder.evaluate().isNotEmpty) {
-      await tester.ensureVisible(finder);
+      final target = finder.first;
+      await tester.ensureVisible(target);
       await tester.pump(const Duration(milliseconds: 250));
-      await tester.tap(finder);
+      await tester.tap(target);
       await tester.pump(const Duration(milliseconds: 500));
       await _waitForSavingToFinish(tester);
       return;
@@ -218,11 +219,12 @@ Future<void> _chooseFirstPickerValue(
   WidgetTester tester,
   String label,
 ) async {
-  final labelFinder = find.text(label).first;
+  final labelCandidates = find.text(label);
   final deadline = DateTime.now().add(const Duration(seconds: 30));
   while (DateTime.now().isBefore(deadline)) {
     await tester.pump(const Duration(milliseconds: 250));
-    if (labelFinder.evaluate().isNotEmpty) {
+    if (labelCandidates.evaluate().isNotEmpty) {
+      final labelFinder = labelCandidates.first;
       await tester.ensureVisible(labelFinder);
       await tester.pump(const Duration(milliseconds: 250));
       final pickerField = find
