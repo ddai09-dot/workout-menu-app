@@ -31,12 +31,13 @@ fi
 
 python3 "$ROOT/tools/task20_d2a_prepare_ui_acceptance.py" "$APP_DIR"
 (
+  set -x
   cd "$APP_DIR"
   flutter pub get
-  dart format --output=none --set-exit-if-changed integration_test test_driver
+  dart format integration_test test_driver
   flutter analyze integration_test
   flutter analyze test_driver
-)
+) 2>&1 | tee "$LOG_DIR/overlay_preflight.log"
 
 cleanup() {
   while IFS=$'\t' read -r role udid runtime device_name; do
