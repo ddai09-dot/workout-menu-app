@@ -1,6 +1,7 @@
 import 'dart:io';
 
-import 'package:integration_test/integration_test_driver.dart';
+import 'package:flutter_driver/flutter_driver.dart';
+import 'package:integration_test/integration_test_driver_extended.dart';
 
 Future<void> main() async {
   final outputDirectory = Platform.environment['TASK20_D2_SCREENSHOT_DIR'];
@@ -9,8 +10,10 @@ Future<void> main() async {
   }
   final directory = Directory(outputDirectory);
   await directory.create(recursive: true);
+  final driver = await FlutterDriver.connect();
 
   await integrationDriver(
+    driver: driver,
     onScreenshot: (
       String name,
       List<int> bytes, [
