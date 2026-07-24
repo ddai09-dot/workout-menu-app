@@ -4,7 +4,7 @@ from __future__ import annotations
 import base64, gzip, hashlib, shutil, subprocess, sys, zipfile
 from pathlib import Path
 
-EXPECTED_SHA256 = "322aa363bbd3f2cccc8c615e56975c4c4c5c0ab7b1ac772c4eae20a4536099f3"
+EXPECTED_SHA256 = "5d9e35459123afdd22765e03e256fb9d9353cc0340c5f32bffd44b13cc0691c9"
 EXCLUDED_TOP_LEVEL = {"build", ".dart_tool"}
 
 
@@ -23,23 +23,42 @@ def load_patch() -> bytes:
         fail(f"Task20-C5 patch payload decode failed: {exc}")
 
 
-def reorder_ios_validation(root: Path) -> None:
-    """Run canonical source verification before flutter create mutates iOS files."""
-    path = root / "tools/run_task20_b_ios_simulator.sh"
-    text = path.read_text(encoding="utf-8")
-    create_start = text.find('GENERATED_WIDGET_TEST_PATH="test/widget_test.dart"')
-    common_start = text.find('COMMON_LOG_DIR="$LOG_DIR/flutter_checks"', create_start)
-    build_start = text.find(
+def normalize_validation_order(root: Path) -> None:
+    """Verify pristine canonical source before generated artifacts or iOS scaffolding."""
+    flutter_path = root / "tools/run_task20_b_flutter_checks.sh"
+    flutter_text = flutter_path.read_text(encoding="utf-8")
+    make_line = 'run_logged_step "make_verify" "make_verify.log" make verify\n'
+    config_marker = "mkdir -p config\n"
+    if flutter_text.count(make_line) != 1 or flutter_text.count(config_marker) != 1:
+        fail("Expected Task20-B Flutter validation blocks were not found")
+    flutter_text = flutter_text.replace(make_line, "")
+    config_start = flutter_text.index(config_marker)
+    flutter_path.write_text(
+        flutter_text[:config_start] + make_line + flutter_text[config_start:],
+        encoding="utf-8",
+    )
+
+    ios_path = root / "tools/run_task20_b_ios_simulator.sh"
+    ios_text = ios_path.read_text(encoding="utf-8")
+    create_start = ios_text.find('GENERATED_WIDGET_TEST_PATH="test/widget_test.dart"')
+    common_start = ios_text.find(
+        'COMMON_LOG_DIR="$LOG_DIR/flutter_checks"', create_start
+    )
+    build_start = ios_text.find(
         'run_logged_step "flutter_build_ios_simulator"', common_start
     )
     if min(create_start, common_start, build_start) < 0:
         fail("Expected Task20-B iOS validation blocks were not found")
-    create_chunk = text[create_start:common_start]
-    common_chunk = text[common_start:build_start]
-    if text.count('COMMON_LOG_DIR="$LOG_DIR/flutter_checks"') != 1:
+    create_chunk = ios_text[create_start:common_start]
+    common_chunk = ios_text[common_start:build_start]
+    if ios_text.count('COMMON_LOG_DIR="$LOG_DIR/flutter_checks"') != 1:
         fail("Expected exactly one common Flutter-check block")
-    path.write_text(
-        text[:create_start] + common_chunk + "\n" + create_chunk + text[build_start:],
+    ios_path.write_text(
+        ios_text[:create_start]
+        + common_chunk
+        + "\n"
+        + create_chunk
+        + ios_text[build_start:],
         encoding="utf-8",
     )
 
@@ -85,7 +104,7 @@ def main() -> int:
         fail(f"Canonical integration patch failed with exit code {completed.returncode}")
     if "version: 0.9.2+20\n" not in pubspec.read_text(encoding="utf-8"):
         fail("Canonical integration did not produce v0.9.2+20")
-    reorder_ios_validation(root)
+    normalize_validation_order(root)
     shutil.rmtree(root / "build", ignore_errors=True)
     shutil.rmtree(root / ".dart_tool", ignore_errors=True)
     write_deterministic_zip(root, output)
