@@ -52,7 +52,9 @@ while IFS=$'\t' read -r role udid runtime device_name; do
   screenshot_dir="$device_dir/screenshots"
   mkdir -p "$screenshot_dir"
   log_file="$device_dir/flutter_drive.log"
+  run_result_file="$device_dir/flutter_drive_result.json"
 
+  echo "Task 20-D2A starting: role=$role device=$device_name runtime=$runtime udid=$udid"
   xcrun simctl shutdown "$udid" >/dev/null 2>&1 || true
   xcrun simctl erase "$udid"
   xcrun simctl boot "$udid"
@@ -62,20 +64,30 @@ while IFS=$'\t' read -r role udid runtime device_name; do
   (
     cd "$APP_DIR"
     TASK20_D2_SCREENSHOT_DIR="$screenshot_dir" \
-      flutter drive \
-        --driver=test_driver/task20_d2a_driver.dart \
-        --target=integration_test/task20_d2a_onboarding_reset_test.dart \
-        -d "$udid"
-  ) 2>&1 | tee "$log_file"
-  drive_code="${PIPESTATUS[0]}"
+      python3 "$ROOT/tools/task20_d2a_run_with_timeout.py" \
+        --timeout-seconds 1200 \
+        --log-file "$log_file" \
+        --result-file "$run_result_file" \
+        -- \
+        flutter drive \
+          --driver=test_driver/task20_d2a_driver.dart \
+          --target=integration_test/task20_d2a_onboarding_reset_test.dart \
+          -d "$udid"
+  )
+  drive_code="$?"
   set -e
 
   if [[ "$drive_code" -ne 0 ]]; then
     ROLE="$role" DEVICE_NAME="$device_name" RUNTIME="$runtime" UDID="$udid" \
-      EXIT_CODE="$drive_code" RESULT_LINES="$RESULT_LINES" python3 - <<'PY'
+      EXIT_CODE="$drive_code" RESULT_LINES="$RESULT_LINES" \
+      RUN_RESULT_FILE="$run_result_file" python3 - <<'PY'
 import json
 import os
 from pathlib import Path
+run_result_file = Path(os.environ["RUN_RESULT_FILE"])
+run_result = {}
+if run_result_file.is_file():
+    run_result = json.loads(run_result_file.read_text(encoding="utf-8"))
 payload = {
     "role": os.environ["ROLE"],
     "device_name": os.environ["DEVICE_NAME"],
@@ -83,6 +95,8 @@ payload = {
     "udid": os.environ["UDID"],
     "status": "FAIL",
     "exit_code": int(os.environ["EXIT_CODE"]),
+    "timed_out": bool(run_result.get("timed_out", False)),
+    "duration_seconds": run_result.get("duration_seconds"),
 }
 with Path(os.environ["RESULT_LINES"]).open("a", encoding="utf-8") as stream:
     stream.write(json.dumps(payload, ensure_ascii=False, sort_keys=True) + "\n")
@@ -101,7 +115,8 @@ PY
   shasum -a 256 "$screenshot_dir"/*.png > "$device_dir/screenshots.sha256"
 
   ROLE="$role" DEVICE_NAME="$device_name" RUNTIME="$runtime" UDID="$udid" \
-    SCREENSHOT_DIR="$screenshot_dir" RESULT_LINES="$RESULT_LINES" python3 - <<'PY'
+    SCREENSHOT_DIR="$screenshot_dir" RESULT_LINES="$RESULT_LINES" \
+    RUN_RESULT_FILE="$run_result_file" python3 - <<'PY'
 import hashlib
 import json
 import os
@@ -113,6 +128,8 @@ for path in sorted(Path(os.environ["SCREENSHOT_DIR"]).glob("*.png")):
         "sha256": hashlib.sha256(path.read_bytes()).hexdigest(),
         "size_bytes": path.stat().st_size,
     })
+run_result_file = Path(os.environ["RUN_RESULT_FILE"])
+run_result = json.loads(run_result_file.read_text(encoding="utf-8"))
 payload = {
     "role": os.environ["ROLE"],
     "device_name": os.environ["DEVICE_NAME"],
@@ -120,6 +137,7 @@ payload = {
     "udid": os.environ["UDID"],
     "status": "PASS",
     "exit_code": 0,
+    "duration_seconds": run_result.get("duration_seconds"),
     "screenshots": screenshots,
 }
 with Path(os.environ["RESULT_LINES"]).open("a", encoding="utf-8") as stream:
