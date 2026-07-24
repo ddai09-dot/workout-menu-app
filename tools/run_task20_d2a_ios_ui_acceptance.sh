@@ -70,6 +70,7 @@ while IFS=$'\t' read -r role udid runtime device_name; do
         --result-file "$run_result_file" \
         -- \
         flutter drive \
+          --no-dds \
           --driver=test_driver/task20_d2a_driver.dart \
           --target=integration_test/task20_d2a_onboarding_reset_test.dart \
           -d "$udid"
