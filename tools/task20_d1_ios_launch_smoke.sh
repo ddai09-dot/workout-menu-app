@@ -7,7 +7,9 @@ cd "$ROOT"
 APP_PATH="${1:-$ROOT/build/ios/iphonesimulator/Runner.app}"
 BUNDLE_ID="${TASK20_D1_BUNDLE_ID:-jp.workoutmenu.workoutMenuApp}"
 LOG_DIR="${TASK20_D1_LOG_DIR:-$ROOT/build/task20_d1_ios_launch_smoke}"
-SETTLE_SECONDS="${TASK20_D1_SETTLE_SECONDS:-12}"
+MAX_WAIT_SECONDS="${TASK20_D1_MAX_WAIT_SECONDS:-60}"
+SAMPLE_INTERVAL_SECONDS="${TASK20_D1_SAMPLE_INTERVAL_SECONDS:-1}"
+REQUIRED_STABLE_SAMPLES="${TASK20_D1_REQUIRED_STABLE_SAMPLES:-3}"
 DEVICE_FILE="$LOG_DIR/selected_devices.tsv"
 RESULT_LINES="$LOG_DIR/device_results.ndjson"
 
@@ -18,7 +20,7 @@ if [[ "$(uname -s)" != "Darwin" ]]; then
   echo "ERROR: iOS Simulator launch smoke requires macOS." >&2
   exit 2
 fi
-for command_name in xcrun python3 shasum; do
+for command_name in xcrun python3 shasum cmp; do
   if ! command -v "$command_name" >/dev/null 2>&1; then
     echo "ERROR: ${command_name} was not found." >&2
     exit 2
@@ -130,19 +132,56 @@ run_device() {
     return 1
   fi
 
-  sleep "$SETTLE_SECONDS"
-  xcrun simctl io "$udid" screenshot "$screenshot" >>"$command_log" 2>&1
-  test -s "$screenshot"
+  local previous_sample="$device_dir/readiness_previous.png"
+  local current_sample="$device_dir/readiness_current.png"
+  local first_sample="$device_dir/first_sample.png"
+  local started_epoch elapsed stable_transitions=0 attempt=0
+  local required_transitions=$((REQUIRED_STABLE_SAMPLES - 1))
+  if (( REQUIRED_STABLE_SAMPLES < 2 )); then
+    echo "ERROR: TASK20_D1_REQUIRED_STABLE_SAMPLES must be at least 2." >&2
+    return 2
+  fi
+  rm -f "$previous_sample" "$current_sample" "$first_sample" "$screenshot"
+  started_epoch="$(date +%s)"
+  while true; do
+    attempt=$((attempt + 1))
+    xcrun simctl io "$udid" screenshot "$current_sample" >>"$command_log" 2>&1
+    test -s "$current_sample"
+    if (( attempt == 1 )); then
+      cp "$current_sample" "$first_sample"
+    fi
+    if [[ -f "$previous_sample" ]] && cmp -s "$previous_sample" "$current_sample"; then
+      stable_transitions=$((stable_transitions + 1))
+    else
+      stable_transitions=0
+    fi
+    elapsed=$(( $(date +%s) - started_epoch ))
+    if (( stable_transitions >= required_transitions )); then
+      cp "$current_sample" "$screenshot"
+      break
+    fi
+    if (( elapsed >= MAX_WAIT_SECONDS )); then
+      cp "$current_sample" "$screenshot"
+      echo "ERROR: Screen did not become stable within ${MAX_WAIT_SECONDS}s for $role." >&2
+      return 1
+    fi
+    mv "$current_sample" "$previous_sample"
+    sleep "$SAMPLE_INTERVAL_SECONDS"
+  done
+  rm -f "$previous_sample" "$current_sample"
+
   screenshot_sha="$(shasum -a 256 "$screenshot" | awk '{print $1}')"
   printf '%s  %s\n' "$screenshot_sha" "$(basename "$screenshot")" > "$device_dir/screenshot.sha256"
+  printf '%s\n' "$elapsed" > "$device_dir/readiness_seconds.txt"
 
-  # Successful termination after the settle period proves that the process was
-  # still alive when the screenshot was captured.
+  # Successful termination after readiness proves that the process was still
+  # alive when the stable screenshot was captured.
   xcrun simctl terminate "$udid" "$BUNDLE_ID" >>"$command_log" 2>&1
 
   ROLE="$role" UDID="$udid" RUNTIME="$runtime" DEVICE_NAME="$device_name" \
   SCREENSHOT="$screenshot" SCREENSHOT_SHA="$screenshot_sha" \
-  APP_CONTAINER="$app_container" RESULT_LINES="$RESULT_LINES" python3 - <<'PY'
+  APP_CONTAINER="$app_container" RESULT_LINES="$RESULT_LINES" \
+  READINESS_SECONDS="$elapsed" STABLE_SAMPLES="$REQUIRED_STABLE_SAMPLES" python3 - <<'PY'
 import json
 import os
 from pathlib import Path
@@ -155,7 +194,10 @@ payload = {
     "app_container": os.environ["APP_CONTAINER"],
     "screenshot": os.environ["SCREENSHOT"],
     "screenshot_sha256": os.environ["SCREENSHOT_SHA"],
-    "launch_alive_after_settle": True,
+    "launch_alive_after_readiness": True,
+    "screen_stable": True,
+    "stable_screen_wait_seconds": int(os.environ["READINESS_SECONDS"]),
+    "required_stable_samples": int(os.environ["STABLE_SAMPLES"]),
     "status": "PASS",
 }
 with Path(os.environ["RESULT_LINES"]).open("a", encoding="utf-8") as stream:
@@ -169,7 +211,8 @@ while IFS=$'\t' read -r role udid runtime device_name; do
   run_device "$role" "$udid" "$runtime" "$device_name"
 done < "$DEVICE_FILE"
 
-BUNDLE_ID="$BUNDLE_ID" APP_PATH="$APP_PATH" SETTLE_SECONDS="$SETTLE_SECONDS" \
+BUNDLE_ID="$BUNDLE_ID" APP_PATH="$APP_PATH" MAX_WAIT_SECONDS="$MAX_WAIT_SECONDS" \
+SAMPLE_INTERVAL_SECONDS="$SAMPLE_INTERVAL_SECONDS" REQUIRED_STABLE_SAMPLES="$REQUIRED_STABLE_SAMPLES" \
 RESULT_LINES="$RESULT_LINES" LOG_DIR="$LOG_DIR" python3 - <<'PY'
 import json
 import os
@@ -185,7 +228,9 @@ result = {
     "status": "PASS",
     "bundle_id": os.environ["BUNDLE_ID"],
     "app_path": os.environ["APP_PATH"],
-    "settle_seconds": int(os.environ["SETTLE_SECONDS"]),
+    "max_wait_seconds": int(os.environ["MAX_WAIT_SECONDS"]),
+    "sample_interval_seconds": int(os.environ["SAMPLE_INTERVAL_SECONDS"]),
+    "required_stable_samples": int(os.environ["REQUIRED_STABLE_SAMPLES"]),
     "finished_at_utc": datetime.now(timezone.utc)
     .replace(microsecond=0)
     .isoformat()
