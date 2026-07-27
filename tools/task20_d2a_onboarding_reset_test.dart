@@ -126,7 +126,7 @@ void main() {
       await _tapText(tester, '端末内データを削除');
       await _waitForText(tester, 'すべて削除しますか？');
       await _tapText(tester, 'キャンセル');
-      await _waitForText(tester, '端末内データを初期化');
+      await _waitForText(tester, '端末内データを削除');
 
       await _tapText(tester, '端末内データを削除');
       await _waitForText(tester, 'すべて削除しますか？');
