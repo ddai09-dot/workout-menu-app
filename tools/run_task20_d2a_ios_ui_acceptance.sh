@@ -74,10 +74,12 @@ while IFS=$'\t' read -r role udid runtime device_name; do
 
   drive_code=1
   successful_attempt=0
+  attempted_count=0
   last_result_file=""
   retryable_startup_failure=false
 
   for attempt in $(seq 1 "$MAX_STARTUP_ATTEMPTS"); do
+    attempted_count="$attempt"
     attempt_dir="$device_dir/attempt_$attempt"
     attempt_screenshot_dir="$attempt_dir/screenshots"
     log_file="$attempt_dir/flutter_drive.log"
@@ -139,7 +141,7 @@ while IFS=$'\t' read -r role udid runtime device_name; do
   if [[ "$drive_code" -ne 0 ]]; then
     ROLE="$role" DEVICE_NAME="$device_name" RUNTIME="$runtime" UDID="$udid" \
       EXIT_CODE="$drive_code" RESULT_LINES="$RESULT_LINES" \
-      RUN_RESULT_FILE="$last_result_file" ATTEMPTS="$MAX_STARTUP_ATTEMPTS" \
+      RUN_RESULT_FILE="$last_result_file" ATTEMPTS="$attempted_count" \
       RETRYABLE_STARTUP_FAILURE="$retryable_startup_failure" python3 - <<'PY'
 import json
 import os
@@ -210,7 +212,8 @@ PY
   xcrun simctl shutdown "$udid"
 done < "$D1_DEVICE_FILE"
 
-APP_DIR="$APP_DIR" LOG_DIR="$LOG_DIR" RESULT_LINES="$RESULT_LINES" python3 - <<'PY'
+APP_DIR="$APP_DIR" LOG_DIR="$LOG_DIR" RESULT_LINES="$RESULT_LINES" \
+  MAX_STARTUP_ATTEMPTS="$MAX_STARTUP_ATTEMPTS" python3 - <<'PY'
 import json
 import os
 from datetime import datetime, timezone
@@ -230,7 +233,7 @@ result = {
     "devices": devices,
     "verified_cases": ["D2-01", "D2-03", "D2-09", "D2-10-partial"],
     "startup_retry_policy": {
-        "maximum_attempts": 2,
+        "maximum_attempts": int(os.environ["MAX_STARTUP_ATTEMPTS"]),
         "retry_scope": "pre-test debug launch failures with zero screenshots only",
         "test_or_app_failures_retried": False,
     },
