@@ -17,7 +17,7 @@ concurrency:
 jobs:
   ios-simulator-integration:
     runs-on: macos-15
-    timeout-minutes: 90
+    timeout-minutes: 150
     steps:
       - name: Checkout repository
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
@@ -56,6 +56,24 @@ jobs:
           set -Eeuo pipefail
           python3 tools/task20_c5_verify_canonical_package.py app
 
+      - name: Build Task 20-D2A canonical v0.9.3 package
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          python3 tools/task20_d2a_build_canonical_v093.py \
+            app implementation-v0.9.3.zip
+          rm -rf app
+          mkdir app
+          unzip -q implementation-v0.9.3.zip -d app
+          test -f app/pubspec.yaml
+          test -f app/FILE_MANIFEST.txt
+
+      - name: Verify Task 20-D2A canonical package
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          python3 tools/task20_d2a_verify_canonical_v093.py app
+
       - name: Install pinned Flutter SDK from official archive
         id: flutter-sdk
         shell: bash
@@ -87,6 +105,14 @@ jobs:
             bash tools/task20_d1_ios_launch_smoke.sh \
             "$GITHUB_WORKSPACE/app/build/ios/iphonesimulator/Runner.app"
 
+      - name: Run Task 20-D2A automated iOS UI acceptance
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          TASK20_D2_LOG_DIR="$GITHUB_WORKSPACE/app/build/task20_d2a_ios_ui_acceptance" \
+            bash tools/run_task20_d2a_ios_ui_acceptance.sh \
+            "$GITHUB_WORKSPACE/app"
+
       - name: Verify Task 20-C3 clean analyzer gate
         shell: bash
         run: |
@@ -109,9 +135,11 @@ jobs:
           name: task20-b2-ios-evidence-${{ github.run_id }}
           path: |
             implementation-v0.9.2.zip
+            implementation-v0.9.3.zip
             app/build/task20_b_logs/ios
             app/build/task20_b_logs/flutter
             app/build/task20_d1_ios_launch_smoke
+            app/build/task20_d2a_ios_ui_acceptance
             app/pubspec.yaml
             app/pubspec.lock
             app/lib/**/*.g.dart
