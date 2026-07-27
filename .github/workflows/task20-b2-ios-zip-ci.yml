@@ -17,7 +17,7 @@ concurrency:
 jobs:
   ios-simulator-integration:
     runs-on: macos-15
-    timeout-minutes: 150
+    timeout-minutes: 240
     steps:
       - name: Checkout repository
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
@@ -131,6 +131,14 @@ jobs:
             bash tools/run_task20_d2a_ios_ui_acceptance.sh \
             "$GITHUB_WORKSPACE/app"
 
+      - name: Run Task 20-D2C onboarding resume acceptance
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          TASK20_D2C_LOG_DIR="$GITHUB_WORKSPACE/app/build/task20_d2c_onboarding_resume" \
+            bash tools/run_task20_d2c_ios_ui_acceptance.sh \
+            "$GITHUB_WORKSPACE/app"
+
       - name: Verify Task 20-C3 clean analyzer gate
         shell: bash
         run: |
@@ -159,6 +167,7 @@ jobs:
             app/build/task20_b_logs/flutter
             app/build/task20_d1_ios_launch_smoke
             app/build/task20_d2a_ios_ui_acceptance
+            app/build/task20_d2c_onboarding_resume
             app/pubspec.yaml
             app/pubspec.lock
             app/lib/**/*.g.dart
