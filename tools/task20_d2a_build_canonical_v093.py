@@ -8,7 +8,7 @@ import sys
 import zipfile
 from pathlib import Path
 
-EXPECTED_SHA256 = "d401ab4ea82b27a5b79cbcd2476264af847fd5e7bbc14f4a55f4924de98eeb6d"
+EXPECTED_SHA256 = "33077e5db54ac31ef0a99d709931a767a5abad163dba6a45f4ce8a3b91bad13c"
 EXCLUDED_TOP_LEVEL = {"build", ".dart_tool"}
 
 
@@ -36,6 +36,22 @@ def update_source(root: Path) -> None:
         "pubspec.yaml": [("version: 0.9.2+20\n", "version: 0.9.3+21\n")],
         "lib/features/data_management/presentation/local_data_reset_page.dart": [
             ("    context.go('/launch');\n", "    context.go('/onboarding');\n")
+        ],
+        "test/features/data_management/presentation/local_data_reset_page_test.dart": [
+            (
+                "        GoRoute(\n"
+                "          path: '/launch',\n"
+                "          builder: (context, state) => const Scaffold(body: Text('初期登録へ')),\n"
+                "        ),\n",
+                "        GoRoute(\n"
+                "          path: '/onboarding',\n"
+                "          builder: (context, state) => const Scaffold(body: Text('初期登録intro')),\n"
+                "        ),\n",
+            ),
+            (
+                "    expect(find.text('初期登録へ'), findsOneWidget);\n",
+                "    expect(find.text('初期登録intro'), findsOneWidget);\n",
+            ),
         ],
         "tools/verify_local_data_reset_contract.py": [
             (
