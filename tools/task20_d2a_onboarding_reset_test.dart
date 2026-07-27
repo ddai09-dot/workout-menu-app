@@ -13,9 +13,8 @@ void main() {
       await app.main();
       await tester.pump();
 
-      await _waitForText(
+      await _waitForIntroStable(
         tester,
-        'あなたに合うメニューを作ります',
         timeout: const Duration(seconds: 90),
       );
       _expectHealthyFrame(tester);
@@ -131,12 +130,10 @@ void main() {
       await _tapText(tester, '端末内データを削除');
       await _waitForText(tester, 'すべて削除しますか？');
       await _tapText(tester, '削除する');
-      await _waitForText(
+      await _waitForIntroStable(
         tester,
-        'あなたに合うメニューを作ります',
         timeout: const Duration(seconds: 60),
       );
-      expect(find.text('登録を始める'), findsOneWidget);
       expect(find.text('今日やること'), findsNothing);
       _expectHealthyFrame(tester);
       await binding.takeScreenshot('D2A_05_after_local_reset');
@@ -159,6 +156,31 @@ Future<void> _waitForText(
     }
   }
   throw TestFailure('Timed out waiting for text: $text');
+}
+
+Future<void> _waitForIntroStable(
+  WidgetTester tester, {
+  required Duration timeout,
+  int requiredStableSamples = 8,
+}) async {
+  final title = find.text('あなたに合うメニューを作ります');
+  final startButton = find.text('登録を始める');
+  final deadline = DateTime.now().add(timeout);
+  var stableSamples = 0;
+  while (DateTime.now().isBefore(deadline)) {
+    await tester.pump(const Duration(milliseconds: 250));
+    final introVisible =
+        title.evaluate().isNotEmpty && startButton.evaluate().isNotEmpty;
+    if (introVisible) {
+      stableSamples += 1;
+      if (stableSamples >= requiredStableSamples) {
+        return;
+      }
+    } else {
+      stableSamples = 0;
+    }
+  }
+  throw TestFailure('Timed out waiting for stable onboarding intro.');
 }
 
 Future<void> _waitForSavingToFinish(WidgetTester tester) async {
