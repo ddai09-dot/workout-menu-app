@@ -147,6 +147,14 @@ jobs:
             bash tools/run_task20_d2d_ios_ui_acceptance.sh \
             "$GITHUB_WORKSPACE/app"
 
+      - name: Run Task 20-D2E workout core-flow acceptance
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          TASK20_D2E_LOG_DIR="$GITHUB_WORKSPACE/app/build/task20_d2e_workout_core_flow" \
+            bash tools/run_task20_d2e_ios_ui_acceptance.sh \
+            "$GITHUB_WORKSPACE/app"
+
       - name: Verify Task 20-C3 clean analyzer gate
         shell: bash
         run: |
@@ -177,6 +185,7 @@ jobs:
             app/build/task20_d2a_ios_ui_acceptance
             app/build/task20_d2c_onboarding_resume
             app/build/task20_d2d_weekly_planner_resume
+            app/build/task20_d2e_workout_core_flow
             app/pubspec.yaml
             app/pubspec.lock
             app/lib/**/*.g.dart
