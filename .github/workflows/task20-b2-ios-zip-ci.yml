@@ -123,6 +123,15 @@ jobs:
             bash tools/task20_d1_ios_launch_smoke.sh \
             "$GITHUB_WORKSPACE/app/build/ios/iphonesimulator/Runner.app"
 
+      - name: Run Task 20-D2E workout core-flow acceptance
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          TASK20_D2E_DRIVE_TIMEOUT_SECONDS=720 \
+          TASK20_D2E_LOG_DIR="$GITHUB_WORKSPACE/app/build/task20_d2e_workout_core_flow" \
+            bash tools/run_task20_d2e_ios_ui_acceptance.sh \
+            "$GITHUB_WORKSPACE/app"
+
       - name: Run Task 20-D2A automated iOS UI acceptance
         shell: bash
         run: |
@@ -145,14 +154,6 @@ jobs:
           set -Eeuo pipefail
           TASK20_D2D_LOG_DIR="$GITHUB_WORKSPACE/app/build/task20_d2d_weekly_planner_resume" \
             bash tools/run_task20_d2d_ios_ui_acceptance.sh \
-            "$GITHUB_WORKSPACE/app"
-
-      - name: Run Task 20-D2E workout core-flow acceptance
-        shell: bash
-        run: |
-          set -Eeuo pipefail
-          TASK20_D2E_LOG_DIR="$GITHUB_WORKSPACE/app/build/task20_d2e_workout_core_flow" \
-            bash tools/run_task20_d2e_ios_ui_acceptance.sh \
             "$GITHUB_WORKSPACE/app"
 
       - name: Verify Task 20-C3 clean analyzer gate
