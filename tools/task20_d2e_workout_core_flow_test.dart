@@ -20,9 +20,9 @@ void main() {
 
       await tapText(tester, '開始');
       await waitForText(tester, '開始前の確認');
-      expect(find.text('痛み・違和感がありますか？'), findsOneWidget);
-      expect(find.text('予定どおり開始する'), findsOneWidget);
-      expect(find.text('今日の状態を調整'), findsOneWidget);
+      await waitForText(tester, '痛み・違和感がありますか？');
+      await waitForText(tester, '予定どおり開始する');
+      await waitForText(tester, '今日の状態を調整');
       expectHealthyFrame(tester);
       await binding.takeScreenshot('D2E_01_start_check');
 
@@ -96,10 +96,7 @@ void main() {
       await waitForText(tester, '途中で終了');
       await tapText(tester, '途中で終了');
       await waitForText(tester, 'ここまでを記録して終了しますか？');
-      expect(
-        find.text('完了済みのセットは失われません。終了後に未完了理由を記録します。'),
-        findsOneWidget,
-      );
+      expect(find.text('完了済みのセットは失われません。終了後に未完了理由を記録します。'), findsOneWidget);
       await tapText(tester, '終了する');
 
       await waitForText(
@@ -128,6 +125,6 @@ void main() {
       expectHealthyFrame(tester);
       await binding.takeScreenshot('D2E_08_home_completed');
     },
-    timeout: const Timeout(Duration(minutes: 20)),
+    timeout: const Timeout(Duration(minutes: 10)),
   );
 }
