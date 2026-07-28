@@ -1,10 +1,51 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:go_router/go_router.dart';
 import 'package:integration_test/integration_test.dart';
+import 'package:workout_menu_app/features/workout/presentation/workout_notifier.dart';
 import 'package:workout_menu_app/main.dart' as app;
 
 import 'task20_d2d_test_support.dart';
 import 'task20_d2e_test_support.dart';
+
+Future<void> verifyWorkoutStartRepository(
+  IntegrationTestWidgetsFlutterBinding binding,
+  WidgetTester tester,
+) async {
+  final titleFinder = find.text('開始前の確認');
+  expect(titleFinder, findsOneWidget);
+  final context = tester.element(titleFinder);
+  final routeState = GoRouterState.of(context);
+  final dayPlanId = routeState.pathParameters['dayPlanId'];
+  if (dayPlanId == null || dayPlanId.isEmpty) {
+    await binding.takeScreenshot('D2E_DIAG_missing_day_plan_id');
+    throw TestFailure(
+      'Workout start route did not expose a non-empty dayPlanId. '
+      'pathParameters=${routeState.pathParameters}',
+    );
+  }
+
+  final container = ProviderScope.containerOf(context);
+  try {
+    final summary = await container
+        .read(workoutRepositoryProvider)
+        .loadLaunchSummary(dayPlanId)
+        .timeout(const Duration(seconds: 30));
+    if (summary.exercises.isEmpty) {
+      await binding.takeScreenshot('D2E_DIAG_empty_launch_summary');
+      throw TestFailure(
+        'Workout start repository returned no exercises for dayPlanId=$dayPlanId',
+      );
+    }
+  } catch (error, stackTrace) {
+    await binding.takeScreenshot('D2E_DIAG_launch_repository_error');
+    throw TestFailure(
+      'Workout start repository failed for dayPlanId=$dayPlanId: '
+      '$error\n$stackTrace',
+    );
+  }
+}
 
 Future<void> waitForWorkoutStartReady(
   IntegrationTestWidgetsFlutterBinding binding,
@@ -65,6 +106,7 @@ void main() {
 
       await tapText(tester, '開始');
       await waitForText(tester, '開始前の確認');
+      await verifyWorkoutStartRepository(binding, tester);
       await waitForWorkoutStartReady(binding, tester);
       expectHealthyFrame(tester);
       await binding.takeScreenshot('D2E_01_start_check');
