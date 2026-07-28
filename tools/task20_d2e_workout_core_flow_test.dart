@@ -6,6 +6,51 @@ import 'package:workout_menu_app/main.dart' as app;
 import 'task20_d2d_test_support.dart';
 import 'task20_d2e_test_support.dart';
 
+Future<void> waitForWorkoutStartReady(
+  IntegrationTestWidgetsFlutterBinding binding,
+  WidgetTester tester,
+) async {
+  const readyText = '痛み・違和感がありますか？';
+  const errorText = '今日のメニューを読み込めませんでした。';
+  final deadline = DateTime.now().add(const Duration(seconds: 60));
+
+  while (DateTime.now().isBefore(deadline)) {
+    await tester.pump(const Duration(milliseconds: 250));
+    if (find.text(readyText).evaluate().isNotEmpty) {
+      await waitForText(tester, '予定どおり開始する');
+      await waitForText(tester, '今日の状態を調整');
+      return;
+    }
+    if (find.text(errorText).evaluate().isNotEmpty) {
+      await binding.takeScreenshot('D2E_DIAG_start_load_error');
+      throw TestFailure(
+        'Workout start summary returned the visible load-error state: $errorText',
+      );
+    }
+  }
+
+  await binding.takeScreenshot('D2E_DIAG_start_load_timeout');
+  final visibleTexts = find
+      .byType(Text)
+      .evaluate()
+      .map((element) {
+        final text = element.widget as Text;
+        return text.data ?? text.textSpan?.toPlainText() ?? '';
+      })
+      .where((text) => text.trim().isNotEmpty)
+      .toSet()
+      .join(' | ');
+  final progressCount = find
+      .byType(CircularProgressIndicator)
+      .evaluate()
+      .length;
+  throw TestFailure(
+    'Workout start summary did not become ready or show the expected error '
+    'within 60 seconds. progressIndicators=$progressCount; '
+    'visibleTexts=$visibleTexts',
+  );
+}
+
 void main() {
   final binding = IntegrationTestWidgetsFlutterBinding.ensureInitialized();
 
@@ -20,9 +65,7 @@ void main() {
 
       await tapText(tester, '開始');
       await waitForText(tester, '開始前の確認');
-      await waitForText(tester, '痛み・違和感がありますか？');
-      await waitForText(tester, '予定どおり開始する');
-      await waitForText(tester, '今日の状態を調整');
+      await waitForWorkoutStartReady(binding, tester);
       expectHealthyFrame(tester);
       await binding.takeScreenshot('D2E_01_start_check');
 
@@ -96,7 +139,10 @@ void main() {
       await waitForText(tester, '途中で終了');
       await tapText(tester, '途中で終了');
       await waitForText(tester, 'ここまでを記録して終了しますか？');
-      expect(find.text('完了済みのセットは失われません。終了後に未完了理由を記録します。'), findsOneWidget);
+      expect(
+        find.text('完了済みのセットは失われません。終了後に未完了理由を記録します。'),
+        findsOneWidget,
+      );
       await tapText(tester, '終了する');
 
       await waitForText(
