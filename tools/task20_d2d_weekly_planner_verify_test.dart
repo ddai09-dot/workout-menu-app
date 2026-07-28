@@ -1,3 +1,4 @@
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
 import 'package:workout_menu_app/main.dart' as app;
@@ -31,7 +32,11 @@ void main() {
       expectHealthyFrame(tester);
       await binding.takeScreenshot('D2D_03_adjustment_restored');
 
-      await tapTooltip(tester, '戻る');
+      await tapFinder(
+        tester,
+        find.byIcon(Icons.arrow_back),
+        description: 'back arrow icon',
+      );
       await waitForText(tester, '現在の状態');
       expectSegmentValue(tester, selectorIndex: 0, value: 4);
       expectSegmentValue(tester, selectorIndex: 1, value: 2);
