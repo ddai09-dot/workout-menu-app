@@ -12,12 +12,14 @@ Task20-D2のD2-02「初期登録の途中保存・復帰」を、iPhone 16 Pro�
 - ニックネームと年齢を入力
 - 一番の目的、ほかの目的まで進む
 - 「トレーニング経験」画面で保存完了を待つ
+- `flutter drive --keep-app-running`でPhase 1終了後もRunnerを起動状態に維持
 - 証跡PNGを取得
 
 ### プロセス終了
 
 - `xcrun simctl terminate`でRunnerをOSレベル終了
-- Phase 1終了時点で既に停止していた場合は、一度launchした後にterminateして終了操作を保証
+- terminate成功を必須条件とし、Phase 1終了時点で既に停止している場合はFAILとする
+- 再launchして終了操作を代替確認するフォールバックは行わない
 
 ### Phase 2
 
@@ -41,8 +43,8 @@ Task20-D2のD2-02「初期登録の途中保存・復帰」を、iPhone 16 Pro�
 
 ## 変更しない範囲
 
-- 実装基盤v0.9.4／アプリ0.9.4+22
-- `lib`／`test`の製品コード
+- D2C正式判定時の実装基盤v0.9.4／アプリ0.9.4+22
+- `lib`／既存`test`の製品コード
 - Schema v9／75テーブル
 - Migration／Seed／assets
 - 既存D1／D2A判定
