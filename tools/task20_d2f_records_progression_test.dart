@@ -157,7 +157,7 @@ void main() {
       await tester.pump(const Duration(milliseconds: 500));
       await tapText(tester, '保存する');
       await waitForText(tester, '測定を保存しました。');
-      await waitForText(tester, '65.4kg・18.7%');
+      await scrollToTextD2F(tester, '65.4kg・18.7%', delta: 250);
       final measurements = await repository.loadBodyMeasurements();
       expect(measurements, hasLength(1));
       expect(measurements.single.weightKg, 65.4);
