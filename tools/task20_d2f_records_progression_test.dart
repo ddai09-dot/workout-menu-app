@@ -14,7 +14,7 @@ Future<void> waitForRecordsDashboard(
   IntegrationTestWidgetsFlutterBinding binding,
   WidgetTester tester,
 ) async {
-  const readyText = '最近のトレーニング';
+  const readyText = 'トレーニング履歴';
   const errorText = '記録を読み込めませんでした。';
   final deadline = DateTime.now().add(const Duration(seconds: 90));
 
@@ -73,7 +73,6 @@ void main() {
       GoRouter.of(homeContext).go('/records');
       await tester.pump(const Duration(milliseconds: 500));
       await waitForRecordsDashboard(binding, tester);
-      await waitForText(tester, '全身A');
       expect(find.text('1 / 1日 完了'), findsOneWidget);
       expectHealthyFrame(tester);
 
@@ -89,9 +88,14 @@ void main() {
       expect(session.exerciseCount, 1);
       expect(session.workSetCount, 1);
       expect(session.hadPain, isFalse);
+
+      await scrollToTextD2F(tester, '最近のトレーニング');
+      await waitForText(tester, '全身A');
+      await waitForText(tester, 'すべて見る');
+      expectHealthyFrame(tester);
       await binding.takeScreenshot('D2F_01_dashboard_recorded');
 
-      await tapText(tester, 'トレーニング履歴');
+      await tapText(tester, 'すべて見る');
       await waitForText(tester, '一部実施');
       expect(find.textContaining('1種目・1セット'), findsOneWidget);
       expectHealthyFrame(tester);
