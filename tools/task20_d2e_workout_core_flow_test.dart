@@ -92,6 +92,22 @@ Future<void> waitForWorkoutStartReady(
   );
 }
 
+Future<void> scrollToText(
+  WidgetTester tester,
+  String text, {
+  double delta = 300,
+  bool useLastScrollable = false,
+}) async {
+  final scrollables = find.byType(Scrollable);
+  expect(scrollables, findsWidgets);
+  await tester.scrollUntilVisible(
+    find.text(text),
+    delta,
+    scrollable: useLastScrollable ? scrollables.last : scrollables.first,
+  );
+  await tester.pump(const Duration(milliseconds: 300));
+}
+
 void main() {
   final binding = IntegrationTestWidgetsFlutterBinding.ensureInitialized();
 
@@ -154,8 +170,14 @@ void main() {
       );
       await waitForText(tester, 'トレーニング中');
 
+      await scrollToText(tester, 'その他の操作');
       await tapText(tester, 'その他の操作');
-      await waitForText(tester, 'セット数を変更する');
+      await scrollToText(
+        tester,
+        'セット数を変更する',
+        delta: 200,
+        useLastScrollable: true,
+      );
       await tapText(tester, 'セット数を変更する');
       await waitForText(tester, 'セット数');
       await selectFirstCupertinoPickerValue(tester);
@@ -177,8 +199,14 @@ void main() {
       expectHealthyFrame(tester);
       await binding.takeScreenshot('D2E_06_next_exercise');
 
+      await scrollToText(tester, 'その他の操作');
       await tapText(tester, 'その他の操作');
-      await waitForText(tester, '途中で終了');
+      await scrollToText(
+        tester,
+        '途中で終了',
+        delta: 200,
+        useLastScrollable: true,
+      );
       await tapText(tester, '途中で終了');
       await waitForText(tester, 'ここまでを記録して終了しますか？');
       expect(
