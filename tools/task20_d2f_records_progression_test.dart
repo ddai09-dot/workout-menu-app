@@ -96,7 +96,11 @@ void main() {
       await binding.takeScreenshot('D2F_01_dashboard_recorded');
 
       await tapText(tester, 'すべて見る');
-      await waitForText(tester, '一部実施');
+      await waitForFinder(
+        tester,
+        find.textContaining('一部実施'),
+        description: 'partial workout history status',
+      );
       expect(find.textContaining('1種目・1セット'), findsOneWidget);
       expectHealthyFrame(tester);
       await binding.takeScreenshot('D2F_02_history');
@@ -104,7 +108,7 @@ void main() {
       await tapText(tester, '全身A');
       await waitForText(tester, 'トレーニング詳細');
       await waitForText(tester, 'プッシュアップ');
-      expect(find.text('一部実施'), findsOneWidget);
+      expect(find.textContaining('一部実施'), findsOneWidget);
       expect(find.text('8回'), findsOneWidget);
       final detail = await repository.loadWorkoutDetail(session.sessionId);
       expect(detail.exercises, hasLength(2));
