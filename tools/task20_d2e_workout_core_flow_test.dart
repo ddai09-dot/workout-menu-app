@@ -149,8 +149,8 @@ void main() {
       await binding.takeScreenshot('D2E_04_form_fallback');
       await tapFinder(
         tester,
-        find.byIcon(Icons.arrow_back),
-        description: 'exercise form back arrow',
+        find.byType(BackButton),
+        description: 'exercise form BackButton',
       );
       await waitForText(tester, 'トレーニング中');
 
