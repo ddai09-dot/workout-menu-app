@@ -153,7 +153,7 @@ void main() {
       expect(fields, findsNWidgets(2));
       await tester.enterText(fields.at(0), '65.4');
       await tester.enterText(fields.at(1), '18.7');
-      tester.testTextInput.hide();
+      FocusManager.instance.primaryFocus?.unfocus();
       await tester.pump(const Duration(milliseconds: 500));
       await tapText(tester, '保存する');
       await waitForText(tester, '測定を保存しました。');
