@@ -48,11 +48,11 @@ run #73の原因特定用に、画面ルートから得た`dayPlanId`を同一Pr
 
 - `WeeklyPlannerNotifier.finalize()`の確定後Plan再読込
 - 実装基盤v0.9.5／アプリ0.9.5+23への正本昇格
-- v0.9.5決定論的生成、固定SHA、manifest、runtime不変範囲の検証
+- v0.9.5決定論的生成、固定SHA、manifest、runtime変更範囲の検証
 - D2E integration test overlay
 - iOS Simulator runner
 - CI実行とArtifact収集
-- レビュー資料
+- D2C／D2Dレビュー資料の判定境界是正
 
 ## 変更しない範囲
 
