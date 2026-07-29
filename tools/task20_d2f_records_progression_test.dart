@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:go_router/go_router.dart';
 import 'package:integration_test/integration_test.dart';
 import 'package:workout_menu_app/features/records/presentation/records_notifier.dart';
 import 'package:workout_menu_app/main.dart' as app;
@@ -8,6 +9,44 @@ import 'package:workout_menu_app/main.dart' as app;
 import 'task20_d2d_test_support.dart';
 import 'task20_d2e_test_support.dart';
 import 'task20_d2f_test_support.dart';
+
+Future<void> waitForRecordsDashboard(
+  IntegrationTestWidgetsFlutterBinding binding,
+  WidgetTester tester,
+) async {
+  const readyText = '最近のトレーニング';
+  const errorText = '記録を読み込めませんでした。';
+  final deadline = DateTime.now().add(const Duration(seconds: 90));
+
+  while (DateTime.now().isBefore(deadline)) {
+    await tester.pump(const Duration(milliseconds: 250));
+    if (find.text(readyText).evaluate().isNotEmpty) return;
+    if (find.text(errorText).evaluate().isNotEmpty) {
+      await binding.takeScreenshot('D2F_DIAG_records_error');
+      throw TestFailure('Records dashboard entered the visible error state.');
+    }
+  }
+
+  await binding.takeScreenshot('D2F_DIAG_records_timeout');
+  final visibleTexts = find
+      .byType(Text)
+      .evaluate()
+      .map((element) {
+        final text = element.widget as Text;
+        return text.data ?? text.textSpan?.toPlainText() ?? '';
+      })
+      .where((text) => text.trim().isNotEmpty)
+      .toSet()
+      .join(' | ');
+  final progressCount = find
+      .byType(CircularProgressIndicator)
+      .evaluate()
+      .length;
+  throw TestFailure(
+    'Records dashboard did not become ready within 90 seconds. '
+    'progressIndicators=$progressCount; visibleTexts=$visibleTexts',
+  );
+}
 
 void main() {
   final binding = IntegrationTestWidgetsFlutterBinding.ensureInitialized();
@@ -19,19 +58,25 @@ void main() {
       await tester.pump();
 
       await completePartialWorkoutForRecords(tester);
-      await tapNavigationLabelD2F(tester, '記録');
-      await waitForText(
-        tester,
-        '最近のトレーニング',
-        timeout: const Duration(seconds: 90),
-      );
+
+      final homeContext = tester.element(find.text('今日やること'));
+      final container = ProviderScope.containerOf(homeContext);
+      final repository = container.read(recordsRepositoryProvider);
+      final dashboardBeforeNavigation = await repository
+          .loadDashboard()
+          .timeout(const Duration(seconds: 30));
+      expect(dashboardBeforeNavigation.sessionsLast30Days, 1);
+      expect(dashboardBeforeNavigation.workSetsLast30Days, 1);
+      expect(dashboardBeforeNavigation.recentSessions, hasLength(1));
+
+      container.invalidate(recordsDashboardProvider);
+      GoRouter.of(homeContext).go('/records');
+      await tester.pump(const Duration(milliseconds: 500));
+      await waitForRecordsDashboard(binding, tester);
       await waitForText(tester, '全身A');
       expect(find.text('1 / 1日 完了'), findsOneWidget);
       expectHealthyFrame(tester);
 
-      final recordsContext = tester.element(find.text('最近のトレーニング'));
-      final container = ProviderScope.containerOf(recordsContext);
-      final repository = container.read(recordsRepositoryProvider);
       final dashboard = await repository.loadDashboard();
       expect(dashboard.sessionsLast30Days, 1);
       expect(dashboard.workSetsLast30Days, 1);
