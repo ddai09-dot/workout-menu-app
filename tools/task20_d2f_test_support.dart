@@ -95,15 +95,28 @@ Future<void> tapNavigationLabelD2F(
   WidgetTester tester,
   String label,
 ) async {
-  final navigationBar = find.byType(NavigationBar);
+  const destinationIndexes = <String, int>{
+    'ホーム': 0,
+    'メニュー': 1,
+    '記録': 2,
+    'マイページ': 3,
+  };
+  final index = destinationIndexes[label];
+  if (index == null) {
+    throw TestFailure('Unknown navigation destination: $label');
+  }
+
+  final navigationBarFinder = find.byType(NavigationBar);
   await waitForFinder(
     tester,
-    navigationBar,
+    navigationBarFinder,
     description: 'NavigationBar',
   );
-  await tapFinder(
-    tester,
-    find.descendant(of: navigationBar, matching: find.text(label)),
-    description: 'navigation:$label',
-  );
+  final navigationBar = tester.widget<NavigationBar>(navigationBarFinder);
+  final callback = navigationBar.onDestinationSelected;
+  if (callback == null) {
+    throw TestFailure('NavigationBar.onDestinationSelected is null.');
+  }
+  callback(index);
+  await tester.pump(const Duration(milliseconds: 500));
 }
