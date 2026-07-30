@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-import 'task20_d2d_test_support.dart';
-
 Future<void> scrollToTextD2G(
   WidgetTester tester,
   String text, {
