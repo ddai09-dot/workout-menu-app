@@ -77,7 +77,7 @@ def patch_training_settings_navigation(app_dir: Path) -> None:
     setState(() => _allowPop = true);
     await WidgetsBinding.instance.endOfFrame;
     if (mounted) {
-      context.pop();
+      Navigator.of(context).pop();
     }
   }
 
