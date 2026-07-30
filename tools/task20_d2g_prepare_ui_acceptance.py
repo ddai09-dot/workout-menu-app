@@ -6,6 +6,105 @@ import sys
 from pathlib import Path
 
 
+def patch_training_settings_navigation(app_dir: Path) -> None:
+    path = (
+        app_dir
+        / "lib"
+        / "features"
+        / "settings"
+        / "presentation"
+        / "training_settings_edit_page.dart"
+    )
+    if not path.is_file():
+        raise SystemExit(f"training settings page not found: {path}")
+
+    text = path.read_text(encoding="utf-8")
+    helper = "Future<void> _popAfterAllowing() async"
+    if helper in text:
+        return
+
+    replacements = (
+        (
+            """        _allowPop = true;
+        context.pop();
+""",
+            """        await _popAfterAllowing();
+""",
+            1,
+        ),
+        (
+            """    _allowPop = true;
+    if (review == true) {
+      context.go('/menu/weekly-planner');
+    } else {
+      context.pop();
+    }
+""",
+            """    if (review == true) {
+      context.go('/menu/weekly-planner');
+    } else {
+      await _popAfterAllowing();
+    }
+""",
+            1,
+        ),
+        (
+            """    } else {
+      _allowPop = true;
+      context.pop();
+    }
+  }
+
+  Future<void> _confirmDiscard() async {
+""",
+            """    } else {
+      unawaited(_popAfterAllowing());
+    }
+  }
+
+  Future<void> _popAfterAllowing() async {
+    if (!mounted) {
+      return;
+    }
+    setState(() => _allowPop = true);
+    await WidgetsBinding.instance.endOfFrame;
+    if (mounted) {
+      context.pop();
+    }
+  }
+
+  Future<void> _confirmDiscard() async {
+""",
+            1,
+        ),
+        (
+            """    if (discard == true && mounted) {
+      setState(() => _allowPop = true);
+      context.pop();
+    }
+""",
+            """    if (discard == true && mounted) {
+      await _popAfterAllowing();
+    }
+""",
+            1,
+        ),
+    )
+
+    for before, after, expected_count in replacements:
+        actual_count = text.count(before)
+        if actual_count != expected_count:
+            raise SystemExit(
+                "training settings navigation patch source mismatch: "
+                f"expected {expected_count}, found {actual_count} for {before!r}"
+            )
+        text = text.replace(before, after, expected_count)
+
+    if helper not in text:
+        raise SystemExit("training settings navigation helper was not installed")
+    path.write_text(text, encoding="utf-8")
+
+
 def main() -> int:
     if len(sys.argv) != 2:
         raise SystemExit("usage: task20_d2g_prepare_ui_acceptance.py <app-dir>")
@@ -50,11 +149,13 @@ def main() -> int:
             encoding="utf-8",
         )
 
+    patch_training_settings_navigation(app_dir)
+
     for source, destination in source_files.items():
         destination.parent.mkdir(parents=True, exist_ok=True)
         shutil.copyfile(source, destination)
 
-    print(f"Prepared Task 20-D2G test overlay in {app_dir}")
+    print(f"Prepared Task 20-D2G test and navigation-fix overlay in {app_dir}")
     return 0
 
 
