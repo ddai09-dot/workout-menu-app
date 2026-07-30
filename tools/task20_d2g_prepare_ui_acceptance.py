@@ -19,8 +19,8 @@ def patch_training_settings_navigation(app_dir: Path) -> None:
         raise SystemExit(f"training settings page not found: {path}")
 
     text = path.read_text(encoding="utf-8")
-    marker = "context.go('/my-page');"
-    if text.count(marker) >= 3:
+    helper_marker = "Future<void> _popAfterAllowing() async"
+    if helper_marker in text:
         return
 
     replacements = (
@@ -28,7 +28,7 @@ def patch_training_settings_navigation(app_dir: Path) -> None:
             """        _allowPop = true;
         context.pop();
 """,
-            """        context.go('/my-page');
+            """        await _popAfterAllowing();
 """,
             1,
         ),
@@ -43,7 +43,7 @@ def patch_training_settings_navigation(app_dir: Path) -> None:
             """    if (review == true) {
       context.go('/menu/weekly-planner');
     } else {
-      context.go('/my-page');
+      await _popAfterAllowing();
     }
 """,
             1,
@@ -55,7 +55,7 @@ def patch_training_settings_navigation(app_dir: Path) -> None:
     }
 """,
             """    if (discard == true && mounted) {
-      context.go('/my-page');
+      await _popAfterAllowing();
     }
 """,
             1,
@@ -71,8 +71,25 @@ def patch_training_settings_navigation(app_dir: Path) -> None:
             )
         text = text.replace(before, after, expected_count)
 
-    if text.count(marker) != 3:
-        raise SystemExit("expected three explicit My Page navigation points")
+    helper_anchor = """  void _requestPop() {
+"""
+    helper = """  Future<void> _popAfterAllowing() async {
+    setState(() => _allowPop = true);
+    await WidgetsBinding.instance.endOfFrame;
+    if (mounted) {
+      context.pop();
+    }
+  }
+
+"""
+    if text.count(helper_anchor) != 1:
+        raise SystemExit("expected one _requestPop helper insertion point")
+    text = text.replace(helper_anchor, helper + helper_anchor, 1)
+
+    if text.count(helper_marker) != 1:
+        raise SystemExit("expected one post-frame pop helper")
+    if text.count("await _popAfterAllowing();") != 3:
+        raise SystemExit("expected three safe settings pop call sites")
     path.write_text(text, encoding="utf-8")
 
 
