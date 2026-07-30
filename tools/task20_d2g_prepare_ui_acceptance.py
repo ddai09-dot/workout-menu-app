@@ -19,8 +19,8 @@ def patch_training_settings_navigation(app_dir: Path) -> None:
         raise SystemExit(f"training settings page not found: {path}")
 
     text = path.read_text(encoding="utf-8")
-    helper = "Future<void> _popAfterAllowing() async"
-    if helper in text:
+    marker = "context.go('/my-page');"
+    if text.count(marker) >= 3:
         return
 
     replacements = (
@@ -28,7 +28,7 @@ def patch_training_settings_navigation(app_dir: Path) -> None:
             """        _allowPop = true;
         context.pop();
 """,
-            """        await _popAfterAllowing();
+            """        context.go('/my-page');
 """,
             1,
         ),
@@ -43,37 +43,8 @@ def patch_training_settings_navigation(app_dir: Path) -> None:
             """    if (review == true) {
       context.go('/menu/weekly-planner');
     } else {
-      await _popAfterAllowing();
+      context.go('/my-page');
     }
-""",
-            1,
-        ),
-        (
-            """    } else {
-      _allowPop = true;
-      context.pop();
-    }
-  }
-
-  Future<void> _confirmDiscard() async {
-""",
-            """    } else {
-      unawaited(_popAfterAllowing());
-    }
-  }
-
-  Future<void> _popAfterAllowing() async {
-    if (!mounted) {
-      return;
-    }
-    setState(() => _allowPop = true);
-    await WidgetsBinding.instance.endOfFrame;
-    if (mounted) {
-      context.pop();
-    }
-  }
-
-  Future<void> _confirmDiscard() async {
 """,
             1,
         ),
@@ -84,8 +55,7 @@ def patch_training_settings_navigation(app_dir: Path) -> None:
     }
 """,
             """    if (discard == true && mounted) {
-      setState(() => _draft = _original);
-      await _popAfterAllowing();
+      context.go('/my-page');
     }
 """,
             1,
@@ -101,8 +71,8 @@ def patch_training_settings_navigation(app_dir: Path) -> None:
             )
         text = text.replace(before, after, expected_count)
 
-    if helper not in text:
-        raise SystemExit("training settings navigation helper was not installed")
+    if text.count(marker) != 3:
+        raise SystemExit("expected three explicit My Page navigation points")
     path.write_text(text, encoding="utf-8")
 
 
