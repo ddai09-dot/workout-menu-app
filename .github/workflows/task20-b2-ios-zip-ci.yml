@@ -141,6 +141,15 @@ jobs:
             bash tools/task20_d1_ios_launch_smoke.sh \
             "$GITHUB_WORKSPACE/app/build/ios/iphonesimulator/Runner.app"
 
+      - name: Run Task 20-D2G My Page settings acceptance
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          TASK20_D2G_DRIVE_TIMEOUT_SECONDS=1500 \
+          TASK20_D2G_LOG_DIR="$GITHUB_WORKSPACE/app/build/task20_d2g_my_page_settings" \
+            bash tools/run_task20_d2g_ios_ui_acceptance.sh \
+            "$GITHUB_WORKSPACE/app"
+
       - name: Run Task 20-D2F records and progression acceptance
         shell: bash
         run: |
@@ -216,6 +225,7 @@ jobs:
             app/build/task20_d2d_weekly_planner_resume
             app/build/task20_d2e_workout_core_flow
             app/build/task20_d2f_records_progression
+            app/build/task20_d2g_my_page_settings
             app/pubspec.yaml
             app/pubspec.lock
             app/lib/**/*.g.dart
