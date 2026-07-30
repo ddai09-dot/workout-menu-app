@@ -84,6 +84,7 @@ def patch_training_settings_navigation(app_dir: Path) -> None:
     }
 """,
             """    if (discard == true && mounted) {
+      setState(() => _draft = _original);
       await _popAfterAllowing();
     }
 """,
