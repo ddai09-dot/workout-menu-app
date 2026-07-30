@@ -51,7 +51,7 @@ Future<void> verifySectionRoute(
   await waitForText(tester, description);
   expectSaveButtonEnabled(tester, false);
   expectHealthyFrame(tester);
-  await pageBackD2G(tester);
+  await pressVisibleBackControlD2G(tester);
   await waitForText(tester, 'トレーニング目的');
 }
 
@@ -107,13 +107,13 @@ void main() {
       await waitForText(tester, 'アプリのおすすめに任せる');
       await tapText(tester, '部位を基準に分ける');
       expectSaveButtonEnabled(tester, true);
-      await tapTooltip(tester, '戻る');
+      await pressVisibleBackControlD2G(tester);
       await waitForText(tester, '変更を破棄しますか？');
       await binding.takeScreenshot('D2G_03_discard_confirmation');
       await tapText(tester, '編集を続ける');
       await waitForText(tester, 'メニューの分け方');
       expectSaveButtonEnabled(tester, true);
-      await tapTooltip(tester, '戻る');
+      await pressVisibleBackControlD2G(tester);
       await waitForText(tester, '変更を破棄しますか？');
       await tapText(tester, '破棄する');
       await waitForText(tester, 'トレーニング設定');
@@ -191,7 +191,7 @@ void main() {
       );
       expectHealthyFrame(tester);
       await binding.takeScreenshot('D2G_07_faq');
-      await pageBackD2G(tester);
+      await pressVisibleBackControlD2G(tester);
       await waitForText(tester, 'トレーニング設定');
 
       await scrollToTextD2G(tester, '端末内データ');
