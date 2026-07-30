@@ -51,8 +51,8 @@ Future<void> verifySectionRoute(
   await waitForText(tester, description);
   expectSaveButtonEnabled(tester, false);
   expectHealthyFrame(tester);
-  await tapTooltip(tester, '戻る');
-  await waitForText(tester, 'トレーニング設定');
+  await pageBackD2G(tester);
+  await waitForText(tester, 'トレーニング目的');
 }
 
 void main() {
