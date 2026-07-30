@@ -1,0 +1,47 @@
+# Task20-D2G レビュー資料
+
+## 対象
+
+Task20-D2のD2-07「マイページ設定」のうち、7区分の表示・遷移、未変更時の保存無効、未保存変更の破棄確認、通常変更の保存、制限強化時の今週確認案内、作成済み週間メニューの不変性、用語・FAQ、端末内データ入口を、通常サイズ／小型サイズの2 iOS Simulatorで自動受入する。
+
+対象正本はmain上の実装基盤v0.9.5／アプリ0.9.5+23、Schema v9／75テーブルとする。製品コード、Migration、Seed、assetsは変更しない。
+
+## 実行導線
+
+1. クリーン状態から初期登録と初回週メニュー確定を行う
+2. マイページで7つのトレーニング設定区分をすべて開く
+3. 各区分で変更前の保存ボタンが無効であることを確認する
+4. メニュー分割を変更し、戻る時の破棄確認で編集継続と破棄を確認する
+5. 主目的を変更して保存し、次回メニュー適用と現在週メニュー不変を確認する
+6. 痛み・制限を追加して保存し、今週メニュー確認案内と自動変更なしを確認する
+7. `change_applies_from = NEXT_MENU`をSQLiteで確認する
+8. 用語・FAQを開き、同梱説明を確認する
+9. 端末内データ画面を開き、確認前の削除ボタンが無効であることを確認する
+
+UI表示だけでなく、同一ProviderScopeのTrainingSettingsRepositoryとAppDatabaseから設定値、現在週メニュー5テーブル、適用境界を再読込して照合する。
+
+## 証跡
+
+各端末8枚、合計16枚を取得する。
+
+- `D2G_01_my_page_sections_top.png`
+- `D2G_02_my_page_sections_bottom.png`
+- `D2G_03_discard_confirmation.png`
+- `D2G_04_goal_saved.png`
+- `D2G_05_restriction_review_prompt.png`
+- `D2G_06_restriction_saved.png`
+- `D2G_07_faq.png`
+- `D2G_08_data_reset_entry.png`
+
+## 判定境界
+
+PASS時もD2-07は`AUTOMATED PASS（partial）`とする。次は未確認のまま維持する。
+
+- 7区分すべての全入力組合せと保存
+- 環境・器具削減、利用可能重量縮小の全分岐
+- 「今週のメニューを確認」を選択した後の週間調整完遂
+- 保存失敗注入と入力保持
+- 設定保存後の強制終了・再起動
+- iPhone実機、Dynamic Type、native accessibility
+
+Task20-D2およびTask20-B全体は未完了とする。
