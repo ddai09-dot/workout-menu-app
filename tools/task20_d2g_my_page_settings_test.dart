@@ -7,6 +7,7 @@ import 'package:integration_test/integration_test.dart';
 import 'package:workout_menu_app/core/database/app_database.dart';
 import 'package:workout_menu_app/core/database/providers/database_providers.dart';
 import 'package:workout_menu_app/core/widgets/primary_action_button.dart';
+import 'package:workout_menu_app/features/settings/domain/training_settings_repository.dart';
 import 'package:workout_menu_app/features/settings/presentation/training_settings_providers.dart';
 import 'package:workout_menu_app/main.dart' as app;
 
@@ -53,6 +54,36 @@ Future<void> verifySectionRoute(
   expectHealthyFrame(tester);
   await pressVisibleBackControlD2G(tester);
   await waitForText(tester, 'トレーニング目的');
+}
+
+Future<void> waitForGoalSaveOutcomeD2G(
+  WidgetTester tester, {
+  required TrainingSettingsRepository settingsRepository,
+  required IntegrationTestWidgetsFlutterBinding binding,
+}) async {
+  const errorText =
+      '変更を保存できませんでした。入力内容は画面に残っています。もう一度お試しください。';
+  final deadline = DateTime.now().add(const Duration(seconds: 90));
+  while (DateTime.now().isBefore(deadline)) {
+    await tester.pump(const Duration(milliseconds: 250));
+    if (find.text('トレーニング設定').evaluate().isNotEmpty) {
+      return;
+    }
+    if (find.text(errorText).evaluate().isNotEmpty) {
+      await binding.takeScreenshot('DIAG_D2G_goal_save_failed');
+      final snapshot = await settingsRepository.load();
+      throw TestFailure(
+        'Goal save failed in UI. Persisted primaryGoalCode: '
+        '${snapshot.draft.primaryGoalCode}; expected: STRENGTH.',
+      );
+    }
+  }
+  await binding.takeScreenshot('DIAG_D2G_goal_save_timeout');
+  final snapshot = await settingsRepository.load();
+  throw TestFailure(
+    'Timed out waiting for goal save navigation. Persisted primaryGoalCode: '
+    '${snapshot.draft.primaryGoalCode}; expected: STRENGTH.',
+  );
 }
 
 void main() {
@@ -124,13 +155,14 @@ void main() {
       await scrollToTextD2G(tester, 'トレーニング目的');
       await tapText(tester, 'トレーニング目的');
       await waitForText(tester, '筋肉を大きくしたい');
-      await tapText(tester, '筋力を高めたい');
+      expect(find.text('筋力を高めたい'), findsNWidgets(2));
+      await tapTextAt(tester, '筋力を高めたい', 0);
       expectSaveButtonEnabled(tester, true);
       await tapText(tester, '変更を保存する');
-      await waitForText(
+      await waitForGoalSaveOutcomeD2G(
         tester,
-        'トレーニング設定',
-        timeout: const Duration(seconds: 90),
+        settingsRepository: settingsRepository,
+        binding: binding,
       );
       final afterGoalSave = await settingsRepository.load();
       expect(afterGoalSave.draft.primaryGoalCode, 'STRENGTH');
