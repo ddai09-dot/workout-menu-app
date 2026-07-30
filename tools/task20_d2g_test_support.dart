@@ -50,7 +50,29 @@ Future<void> tapNavigationLabelD2G(
   throw TestFailure('Timed out waiting for NavigationBar.');
 }
 
-Future<void> pageBackD2G(WidgetTester tester) async {
-  await tester.pageBack();
-  await tester.pump(const Duration(milliseconds: 500));
+Future<void> pressVisibleBackControlD2G(WidgetTester tester) async {
+  final deadline = DateTime.now().add(const Duration(seconds: 30));
+  while (DateTime.now().isBefore(deadline)) {
+    await tester.pump(const Duration(milliseconds: 250));
+
+    final materialBack = find.byType(BackButton);
+    if (materialBack.evaluate().isNotEmpty) {
+      await tester.tap(materialBack.first);
+      await tester.pump(const Duration(milliseconds: 500));
+      return;
+    }
+
+    final customBack = find.widgetWithIcon(IconButton, Icons.arrow_back);
+    if (customBack.evaluate().isNotEmpty) {
+      final button = tester.widget<IconButton>(customBack.first);
+      final callback = button.onPressed;
+      if (callback == null) {
+        throw TestFailure('Visible settings back control is disabled.');
+      }
+      callback();
+      await tester.pump(const Duration(milliseconds: 500));
+      return;
+    }
+  }
+  throw TestFailure('Timed out waiting for a visible Material back control.');
 }
