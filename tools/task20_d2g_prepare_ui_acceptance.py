@@ -6,91 +6,34 @@ import sys
 from pathlib import Path
 
 
-def patch_training_settings_navigation(app_dir: Path) -> None:
-    path = (
-        app_dir
-        / "lib"
-        / "features"
-        / "settings"
-        / "presentation"
-        / "training_settings_edit_page.dart"
-    )
-    if not path.is_file():
-        raise SystemExit(f"training settings page not found: {path}")
-
-    text = path.read_text(encoding="utf-8")
-    helper_marker = "Future<void> _returnToMyPageAfterAllowing() async"
-    if helper_marker in text:
-        return
-
+def patch_visible_dialog_interactions(test_path: Path) -> None:
+    text = test_path.read_text(encoding="utf-8")
     replacements = (
         (
-            """        _allowPop = true;
-        context.pop();
-""",
-            """        await _returnToMyPageAfterAllowing();
-""",
+            "await waitForText(tester, '変更を破棄しますか？');",
+            "await waitForVisibleTextD2G(tester, '変更を破棄しますか？');",
+            2,
+        ),
+        (
+            "await tapText(tester, '編集を続ける');",
+            "await tapVisibleTextD2G(tester, '編集を続ける');",
             1,
         ),
         (
-            """    _allowPop = true;
-    if (review == true) {
-      context.go('/menu/weekly-planner');
-    } else {
-      context.pop();
-    }
-""",
-            """    if (review == true) {
-      context.go('/menu/weekly-planner');
-    } else {
-      await _returnToMyPageAfterAllowing();
-    }
-""",
-            1,
-        ),
-        (
-            """    if (discard == true && mounted) {
-      setState(() => _allowPop = true);
-      context.pop();
-    }
-""",
-            """    if (discard == true && mounted) {
-      await _returnToMyPageAfterAllowing();
-    }
-""",
+            "await tapText(tester, '破棄する');",
+            "await tapVisibleTextD2G(tester, '破棄する');",
             1,
         ),
     )
-
     for before, after, expected_count in replacements:
         actual_count = text.count(before)
         if actual_count != expected_count:
             raise SystemExit(
-                "training settings navigation patch source mismatch: "
+                "D2G visible-interaction patch source mismatch: "
                 f"expected {expected_count}, found {actual_count} for {before!r}"
             )
-        text = text.replace(before, after, expected_count)
-
-    helper_anchor = """  void _requestPop() {
-"""
-    helper = """  Future<void> _returnToMyPageAfterAllowing() async {
-    setState(() => _allowPop = true);
-    await WidgetsBinding.instance.endOfFrame;
-    if (mounted) {
-      GoRouter.of(context).go('/my-page');
-    }
-  }
-
-"""
-    if text.count(helper_anchor) != 1:
-        raise SystemExit("expected one _requestPop helper insertion point")
-    text = text.replace(helper_anchor, helper + helper_anchor, 1)
-
-    if text.count(helper_marker) != 1:
-        raise SystemExit("expected one post-frame My Page navigation helper")
-    if text.count("await _returnToMyPageAfterAllowing();") != 3:
-        raise SystemExit("expected three explicit My Page return call sites")
-    path.write_text(text, encoding="utf-8")
+        text = text.replace(before, after)
+    test_path.write_text(text, encoding="utf-8")
 
 
 def main() -> int:
@@ -103,6 +46,9 @@ def main() -> int:
     if not pubspec.is_file():
         raise SystemExit(f"pubspec.yaml not found: {pubspec}")
 
+    test_destination = (
+        app_dir / "integration_test" / "task20_d2g_my_page_settings_test.dart"
+    )
     source_files = {
         repo_root / "tools" / "task20_d2d_test_support.dart":
             app_dir / "integration_test" / "task20_d2d_test_support.dart",
@@ -111,7 +57,7 @@ def main() -> int:
         repo_root / "tools" / "task20_d2g_test_support.dart":
             app_dir / "integration_test" / "task20_d2g_test_support.dart",
         repo_root / "tools" / "task20_d2g_my_page_settings_test.dart":
-            app_dir / "integration_test" / "task20_d2g_my_page_settings_test.dart",
+            test_destination,
         repo_root / "tools" / "task20_d2g_driver.dart":
             app_dir / "test_driver" / "task20_d2g_driver.dart",
     }
@@ -137,13 +83,12 @@ def main() -> int:
             encoding="utf-8",
         )
 
-    patch_training_settings_navigation(app_dir)
-
     for source, destination in source_files.items():
         destination.parent.mkdir(parents=True, exist_ok=True)
         shutil.copyfile(source, destination)
+    patch_visible_dialog_interactions(test_destination)
 
-    print(f"Prepared Task 20-D2G test and navigation-fix overlay in {app_dir}")
+    print(f"Prepared Task 20-D2G test-only overlay in {app_dir}")
     return 0
 
 
