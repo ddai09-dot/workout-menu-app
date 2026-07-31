@@ -33,6 +33,46 @@ def patch_visible_dialog_interactions(test_path: Path) -> None:
                 f"expected {expected_count}, found {actual_count} for {before!r}"
             )
         text = text.replace(before, after)
+
+    diagnostic_anchor = """      await tapVisibleTextD2G(tester, '破棄する');
+      await waitForText(tester, 'トレーニング設定');
+"""
+    diagnostic_replacement = """      await tapVisibleTextD2G(tester, '破棄する');
+      await tester.pump(const Duration(seconds: 2));
+      final diagnosticTexts = tester
+          .widgetList<Text>(find.byType(Text).hitTestable())
+          .map((Text widget) =>
+              widget.data ?? widget.textSpan?.toPlainText() ?? '')
+          .where((String value) => value.isNotEmpty)
+          .toList(growable: false);
+      debugPrint(
+        'D2G_AFTER_DISCARD_VISIBLE_TEXTS=${diagnosticTexts.join(' | ')}',
+      );
+      final diagnosticTextFinder = find.byType(Text).hitTestable();
+      if (diagnosticTextFinder.evaluate().isNotEmpty) {
+        final diagnosticContext = tester.element(diagnosticTextFinder.first);
+        debugPrint(
+          'D2G_AFTER_DISCARD_CAN_POP='
+          '${Navigator.of(diagnosticContext).canPop()}',
+        );
+        debugPrint(
+          'D2G_AFTER_DISCARD_ROUTE='
+          '${ModalRoute.of(diagnosticContext)?.settings.name}',
+        );
+      }
+      await binding.takeScreenshot('DIAG_D2G_after_discard');
+      await waitForVisibleTextD2G(
+        tester,
+        'トレーニング設定',
+        timeout: const Duration(seconds: 10),
+      );
+"""
+    if text.count(diagnostic_anchor) != 1:
+        raise SystemExit(
+            "D2G discard diagnostic anchor mismatch: "
+            f"expected 1, found {text.count(diagnostic_anchor)}"
+        )
+    text = text.replace(diagnostic_anchor, diagnostic_replacement, 1)
     test_path.write_text(text, encoding="utf-8")
 
 
