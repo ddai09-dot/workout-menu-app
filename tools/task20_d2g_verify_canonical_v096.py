@@ -7,10 +7,10 @@ import json
 import sys
 from pathlib import Path
 
-EXPECTED_RUNTIME_TREE_SHA256 = "60e0318cb0b32cbe349156e5fe54367533c26fdcb5c80b7b8d265a5d8f42bc9d"
+EXPECTED_RUNTIME_TREE_SHA256 = "cc0c39cc183cdebcc8ef40cb9d8fbe42ee5afb4d6e933081fb8d5b64e72c73bf"
 EXPECTED_SCHEMA_TREE_SHA256 = "bc1dcc6000defb6bde64156e6f019056bf983bcc185cfda108c1635cb754f4af"
 EXPECTED_ASSET_TREE_SHA256 = "cb0c88dc1b40ded797d647904f19b25916cfb8e0c1f3980b141823530ac529fe"
-EXPECTED_EDITOR_SHA256 = "bf2dd8d6cf4d4d3d22b8eab035bf293edc851d4c5fe98f59260540b308b14370"
+EXPECTED_EDITOR_SHA256 = "13328a95bc07b708717843ab9aaf5bf68973e018070719b3cc8f79e8b8b2b741"
 
 
 def require(text: str, value: str, label: str) -> None:
@@ -60,17 +60,21 @@ def main() -> int:
     manifest = (root / "FILE_MANIFEST.txt").read_text(encoding="utf-8")
 
     require(pubspec, "version: 0.9.6+24\n", "canonical app version")
-    require(editor, "Future<void> _returnToMyPageAfterAllowing() async", "return helper")
-    require(editor, "setState(() => _allowPop = true);", "PopScope permission update")
-    require(editor, "await WidgetsBinding.instance.endOfFrame;", "post-frame wait")
-    require(editor, "context.go('/my-page');", "explicit My Page navigation")
-    if editor.count("await _returnToMyPageAfterAllowing();") != 3:
-        raise SystemExit("Expected exactly three safe My Page return call sites")
-    forbid(
+    require(editor, "canPop: !_hasChanges", "single-source PopScope state")
+    require(
         editor,
-        "setState(() => _allowPop = true);\n      context.pop();",
-        "same-frame discard pop",
+        "Future<void> _returnToMyPage({required bool refreshSettings}) async",
+        "return helper",
     )
+    require(editor, "await WidgetsBinding.instance.endOfFrame;", "post-frame wait")
+    require(editor, "_draft = _original;", "discard state reset")
+    require(editor, "context.pop();", "normal My Page pop")
+    if editor.count("_returnToMyPage(refreshSettings: true)") != 2:
+        raise SystemExit("Expected two saved-state My Page return call sites")
+    if editor.count("_returnToMyPage(refreshSettings: false)") != 1:
+        raise SystemExit("Expected one discard My Page return call site")
+    forbid(editor, "_allowPop", "separate pop permission state")
+    forbid(editor, "context.go('/my-page')", "explicit same-branch replacement")
     actual_editor_sha = hashlib.sha256(editor_path.read_bytes()).hexdigest()
     if actual_editor_sha != EXPECTED_EDITOR_SHA256:
         raise SystemExit(
@@ -78,18 +82,16 @@ def main() -> int:
         )
 
     require(readme, "実装基盤 v0.9.6", "README version")
-    require(readme, "PopScope", "README fix summary")
+    require(readme, "設定snapshotは遷移後に再読込", "README fix summary")
     require(matrix, "現在のプロジェクト版：`0.9.6+24`", "version matrix")
-    require(matrix, "タスク20-D2G：設定編集の安全な復帰", "version history")
-    require(roadmap, "v0.9.6：PopScope許可状態", "roadmap fix")
-    require(decision, "D-013 設定編集からの復帰はPopScope反映後に実行する", "decision")
+    require(matrix, "設定snapshotは遷移後に再読込", "version history")
+    require(roadmap, "次フレームで通常popする", "roadmap fix")
+    require(decision, "D-013 設定編集からの復帰は変更状態解除後に実行する", "decision")
     if not fix_report.is_file():
         raise SystemExit("Task20-D2G settings-return fix report is missing")
-    require(
-        fix_report.read_text(encoding="utf-8"),
-        "WidgetsBinding.instance.endOfFrame",
-        "fix report",
-    )
+    fix_text = fix_report.read_text(encoding="utf-8")
+    require(fix_text, "_draft = _original", "fix report state reset")
+    require(fix_text, "WidgetsBinding.instance.endOfFrame", "fix report frame wait")
     require(manifest, "docs/TASK20_D2G_SETTINGS_RETURN_FIX.md", "fix report manifest entry")
 
     actual_files = sorted(
@@ -135,7 +137,7 @@ def main() -> int:
             "schema": schema_files,
             "assets": asset_files,
         },
-        "fix": "wait for PopScope rebuild before explicit My Page navigation",
+        "fix": "clear change state, wait for PopScope rebuild, then normal pop",
         "task20_d2_fully_verified": False,
         "physical_device_verified": False,
         "native_accessibility_verified": False,
