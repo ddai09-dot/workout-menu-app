@@ -110,6 +110,42 @@ jobs:
           set -Eeuo pipefail
           python3 tools/task20_d2e_verify_canonical_v095.py app
 
+      - name: Build Task 20-D2G canonical v0.9.6 package
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          python3 tools/task20_d2g_build_canonical_v096.py \
+            app implementation-v0.9.6.zip
+          rm -rf app
+          mkdir app
+          unzip -q implementation-v0.9.6.zip -d app
+          test -f app/pubspec.yaml
+          test -f app/FILE_MANIFEST.txt
+
+      - name: Verify Task 20-D2G canonical v0.9.6 package
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          python3 tools/task20_d2g_verify_canonical_v096.py app
+
+      - name: Build Task 20-D2G canonical v0.9.7 package
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          python3 tools/task20_d2g_build_canonical_v097.py \
+            app implementation-v0.9.7.zip
+          rm -rf app
+          mkdir app
+          unzip -q implementation-v0.9.7.zip -d app
+          test -f app/pubspec.yaml
+          test -f app/FILE_MANIFEST.txt
+
+      - name: Verify Task 20-D2G canonical v0.9.7 package
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          python3 tools/task20_d2g_verify_canonical_v097.py app
+
       - name: Install pinned Flutter SDK from official archive
         id: flutter-sdk
         shell: bash
@@ -140,6 +176,15 @@ jobs:
           TASK20_D1_LOG_DIR="$GITHUB_WORKSPACE/app/build/task20_d1_ios_launch_smoke" \
             bash tools/task20_d1_ios_launch_smoke.sh \
             "$GITHUB_WORKSPACE/app/build/ios/iphonesimulator/Runner.app"
+
+      - name: Run Task 20-D2G My Page settings acceptance
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          TASK20_D2G_DRIVE_TIMEOUT_SECONDS=1500 \
+          TASK20_D2G_LOG_DIR="$GITHUB_WORKSPACE/app/build/task20_d2g_my_page_settings" \
+            bash tools/run_task20_d2g_ios_ui_acceptance.sh \
+            "$GITHUB_WORKSPACE/app"
 
       - name: Run Task 20-D2F records and progression acceptance
         shell: bash
@@ -208,6 +253,8 @@ jobs:
             implementation-v0.9.3.zip
             implementation-v0.9.4.zip
             implementation-v0.9.5.zip
+            implementation-v0.9.6.zip
+            implementation-v0.9.7.zip
             app/build/task20_b_logs/ios
             app/build/task20_b_logs/flutter
             app/build/task20_d1_ios_launch_smoke
@@ -216,6 +263,7 @@ jobs:
             app/build/task20_d2d_weekly_planner_resume
             app/build/task20_d2e_workout_core_flow
             app/build/task20_d2f_records_progression
+            app/build/task20_d2g_my_page_settings
             app/pubspec.yaml
             app/pubspec.lock
             app/lib/**/*.g.dart
