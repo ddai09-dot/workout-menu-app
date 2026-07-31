@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:go_router/go_router.dart';
 
 Future<void> scrollToTextD2G(
   WidgetTester tester,
@@ -81,6 +82,38 @@ Future<void> waitForVisibleTextD2G(
     }
   }
   throw TestFailure('Timed out waiting for visible text: $text');
+}
+
+String? currentPathD2G(WidgetTester tester) {
+  final visibleText = find.byType(Text).hitTestable();
+  if (visibleText.evaluate().isEmpty) {
+    return null;
+  }
+  final context = tester.element(visibleText.first);
+  return GoRouter.of(context)
+      .routerDelegate
+      .currentConfiguration
+      .uri
+      .path;
+}
+
+Future<void> waitForPathD2G(
+  WidgetTester tester,
+  String expectedPath, {
+  Duration timeout = const Duration(seconds: 30),
+}) async {
+  final deadline = DateTime.now().add(timeout);
+  String? lastPath;
+  while (DateTime.now().isBefore(deadline)) {
+    await tester.pump(const Duration(milliseconds: 250));
+    lastPath = currentPathD2G(tester);
+    if (lastPath == expectedPath) {
+      return;
+    }
+  }
+  throw TestFailure(
+    'Timed out waiting for route: $expectedPath; last route: $lastPath',
+  );
 }
 
 Future<void> pressVisibleBackControlD2G(WidgetTester tester) async {
