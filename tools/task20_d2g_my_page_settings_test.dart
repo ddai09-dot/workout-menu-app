@@ -231,12 +231,13 @@ void main() {
       await waitForText(tester, '端末内データを初期化');
       await waitForText(tester, '削除されるもの');
       await waitForText(tester, '削除されないもの');
-      final deleteButton = find.widgetWithText(
-        FilledButton,
-        '端末内データを削除',
+      await scrollToTextD2G(tester, '端末内データを削除');
+      final deleteButton = find.ancestor(
+        of: find.text('端末内データを削除'),
+        matching: find.bySubtype<ButtonStyleButton>(),
       );
       expect(deleteButton, findsOneWidget);
-      expect(tester.widget<FilledButton>(deleteButton).onPressed, isNull);
+      expect(tester.widget<ButtonStyleButton>(deleteButton).onPressed, isNull);
       expectHealthyFrame(tester);
       await binding.takeScreenshot('D2G_08_data_reset_entry');
     },
