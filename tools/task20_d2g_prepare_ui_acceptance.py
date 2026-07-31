@@ -6,73 +6,99 @@ import sys
 from pathlib import Path
 
 
-def patch_visible_dialog_interactions(test_path: Path) -> None:
-    text = test_path.read_text(encoding="utf-8")
-    replacements = (
-        (
-            "await waitForText(tester, '変更を破棄しますか？');",
-            "await waitForVisibleTextD2G(tester, '変更を破棄しますか？');",
-            2,
-        ),
-        (
-            "await tapText(tester, '編集を続ける');",
-            "await tapVisibleTextD2G(tester, '編集を続ける');",
-            1,
-        ),
-        (
-            "await tapText(tester, '破棄する');",
-            "await tapVisibleTextD2G(tester, '破棄する');",
-            1,
-        ),
-    )
-    for before, after, expected_count in replacements:
-        actual_count = text.count(before)
-        if actual_count != expected_count:
-            raise SystemExit(
-                "D2G visible-interaction patch source mismatch: "
-                f"expected {expected_count}, found {actual_count} for {before!r}"
-            )
-        text = text.replace(before, after)
-
-    diagnostic_anchor = """      await tapVisibleTextD2G(tester, '破棄する');
-      await waitForText(tester, 'トレーニング設定');
-"""
-    diagnostic_replacement = """      await tapVisibleTextD2G(tester, '破棄する');
-      await tester.pump(const Duration(seconds: 2));
-      final diagnosticTexts = tester
-          .widgetList<Text>(find.byType(Text).hitTestable())
-          .map((Text widget) =>
-              widget.data ?? widget.textSpan?.toPlainText() ?? '')
-          .where((String value) => value.isNotEmpty)
-          .toList(growable: false);
-      debugPrint(
-        'D2G_AFTER_DISCARD_VISIBLE_TEXTS=${diagnosticTexts.join(' | ')}',
-      );
-      final diagnosticTextFinder = find.byType(Text).hitTestable();
-      if (diagnosticTextFinder.evaluate().isNotEmpty) {
-        final diagnosticContext = tester.element(diagnosticTextFinder.first);
-        debugPrint(
-          'D2G_AFTER_DISCARD_CAN_POP='
-          '${Navigator.of(diagnosticContext).canPop()}',
-        );
-        debugPrint(
-          'D2G_AFTER_DISCARD_ROUTE='
-          '${ModalRoute.of(diagnosticContext)?.settings.name}',
-        );
-      }
-      await binding.takeScreenshot('DIAG_D2G_after_discard');
-      await waitForVisibleTextD2G(
-        tester,
-        'トレーニング設定',
-        timeout: const Duration(seconds: 10),
-      );
-"""
-    if text.count(diagnostic_anchor) != 1:
+def replace_exact(
+    text: str,
+    before: str,
+    after: str,
+    expected_count: int,
+    label: str,
+) -> str:
+    actual_count = text.count(before)
+    if actual_count != expected_count:
         raise SystemExit(
-            "D2G discard diagnostic anchor mismatch: "
-            f"expected 1, found {text.count(diagnostic_anchor)}"
+            f"D2G {label} source mismatch: "
+            f"expected {expected_count}, found {actual_count} for {before!r}"
         )
-    text = text.replace(diagnostic_anchor, diagnostic_replacement, 1)
+    return text.replace(before, after)
+
+
+def patch_ui_acceptance(test_path: Path) -> None:
+    text = test_path.read_text(encoding="utf-8")
+
+    text = replace_exact(
+        text,
+        "await waitForText(tester, '変更を破棄しますか？');",
+        "await waitForVisibleTextD2G(tester, '変更を破棄しますか？');",
+        2,
+        "visible dialog",
+    )
+    text = replace_exact(
+        text,
+        "await tapText(tester, '編集を続ける');",
+        "await tapVisibleTextD2G(tester, '編集を続ける');",
+        1,
+        "visible continue action",
+    )
+    text = replace_exact(
+        text,
+        "await tapText(tester, '破棄する');",
+        "await tapVisibleTextD2G(tester, '破棄する');",
+        1,
+        "visible discard action",
+    )
+
+    text = replace_exact(
+        text,
+        "await waitForText(tester, 'トレーニング目的');",
+        "await waitForPathD2G(tester, '/my-page');",
+        1,
+        "section return route",
+    )
+    text = replace_exact(
+        text,
+        "if (find.text('トレーニング設定').evaluate().isNotEmpty) {",
+        "if (currentPathD2G(tester) == '/my-page') {",
+        1,
+        "goal save route",
+    )
+    text = replace_exact(
+        text,
+        """      await tapVisibleTextD2G(tester, '破棄する');
+      await waitForText(tester, 'トレーニング設定');
+""",
+        """      await tapVisibleTextD2G(tester, '破棄する');
+      await waitForPathD2G(tester, '/my-page');
+""",
+        1,
+        "discard return route",
+    )
+    text = replace_exact(
+        text,
+        """      await tapText(tester, '今は変更しない');
+      await waitForText(tester, 'トレーニング設定');
+""",
+        """      await tapText(tester, '今は変更しない');
+      await waitForPathD2G(tester, '/my-page');
+""",
+        1,
+        "restriction return route",
+    )
+    text = replace_exact(
+        text,
+        """      await pressVisibleBackControlD2G(tester);
+      await waitForText(tester, 'トレーニング設定');
+
+      await scrollToTextD2G(tester, '端末内データ');
+""",
+        """      await pressVisibleBackControlD2G(tester);
+      await waitForPathD2G(tester, '/my-page');
+
+      await scrollToTextD2G(tester, '端末内データ');
+""",
+        1,
+        "FAQ return route",
+    )
+
     test_path.write_text(text, encoding="utf-8")
 
 
@@ -126,7 +152,7 @@ def main() -> int:
     for source, destination in source_files.items():
         destination.parent.mkdir(parents=True, exist_ok=True)
         shutil.copyfile(source, destination)
-    patch_visible_dialog_interactions(test_destination)
+    patch_ui_acceptance(test_destination)
 
     print(f"Prepared Task 20-D2G test-only overlay in {app_dir}")
     return 0
