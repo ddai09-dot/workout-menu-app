@@ -19,7 +19,7 @@ def patch_training_settings_navigation(app_dir: Path) -> None:
         raise SystemExit(f"training settings page not found: {path}")
 
     text = path.read_text(encoding="utf-8")
-    helper_marker = "Future<void> _popAfterAllowing() async"
+    helper_marker = "Future<void> _returnToMyPageAfterAllowing() async"
     if helper_marker in text:
         return
 
@@ -28,7 +28,7 @@ def patch_training_settings_navigation(app_dir: Path) -> None:
             """        _allowPop = true;
         context.pop();
 """,
-            """        await _popAfterAllowing();
+            """        await _returnToMyPageAfterAllowing();
 """,
             1,
         ),
@@ -43,7 +43,7 @@ def patch_training_settings_navigation(app_dir: Path) -> None:
             """    if (review == true) {
       context.go('/menu/weekly-planner');
     } else {
-      await _popAfterAllowing();
+      await _returnToMyPageAfterAllowing();
     }
 """,
             1,
@@ -55,7 +55,7 @@ def patch_training_settings_navigation(app_dir: Path) -> None:
     }
 """,
             """    if (discard == true && mounted) {
-      await _popAfterAllowing();
+      await _returnToMyPageAfterAllowing();
     }
 """,
             1,
@@ -73,11 +73,11 @@ def patch_training_settings_navigation(app_dir: Path) -> None:
 
     helper_anchor = """  void _requestPop() {
 """
-    helper = """  Future<void> _popAfterAllowing() async {
+    helper = """  Future<void> _returnToMyPageAfterAllowing() async {
     setState(() => _allowPop = true);
     await WidgetsBinding.instance.endOfFrame;
     if (mounted) {
-      Navigator.of(context).pop();
+      GoRouter.of(context).go('/my-page');
     }
   }
 
@@ -87,9 +87,9 @@ def patch_training_settings_navigation(app_dir: Path) -> None:
     text = text.replace(helper_anchor, helper + helper_anchor, 1)
 
     if text.count(helper_marker) != 1:
-        raise SystemExit("expected one post-frame pop helper")
-    if text.count("await _popAfterAllowing();") != 3:
-        raise SystemExit("expected three safe settings pop call sites")
+        raise SystemExit("expected one post-frame My Page navigation helper")
+    if text.count("await _returnToMyPageAfterAllowing();") != 3:
+        raise SystemExit("expected three explicit My Page return call sites")
     path.write_text(text, encoding="utf-8")
 
 
