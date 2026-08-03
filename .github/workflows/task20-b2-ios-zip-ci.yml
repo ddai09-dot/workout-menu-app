@@ -181,7 +181,8 @@ jobs:
         shell: bash
         run: |
           set -Eeuo pipefail
-          TASK20_D2H_DRIVE_TIMEOUT_SECONDS=1500 \
+          TASK20_D2H_DRIVE_TIMEOUT_SECONDS=480 \
+          TASK20_D2H_MAX_STARTUP_ATTEMPTS=3 \
           TASK20_D2H_LOG_DIR="$GITHUB_WORKSPACE/app/build/task20_d2h_restart_persistence" \
             bash tools/run_task20_d2h_ios_ui_acceptance.sh \
             "$GITHUB_WORKSPACE/app"
