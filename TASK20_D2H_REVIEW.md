@@ -4,7 +4,7 @@
 
 Task20-D2のD2-08「強制終了・再起動」の残件から、作成済み週間メニュー、記録済みトレーニング・身体測定、保存済みトレーニング設定を、OSレベルのプロセス終了後に同一Simulator・同一アプリデータで再読込する。
 
-対象正本は実装基盤v0.9.7／アプリ0.9.7+25、Schema v9／75テーブル。製品コード、Schema、Migration、Seed、assetsは変更せず、integration-test overlay、runner、CI接続、証跡だけを追加する。
+対象正本は実装基盤v0.9.7／アプリ0.9.7+25、Schema v9／75テーブル。製品コード、Schema、Migration、Seed、assetsは変更せず、integration-test overlay、runner、CI接続、レビュー資料、証跡メタデータだけを追加・是正する。
 
 ## 2段階実行
 
@@ -37,19 +37,33 @@ Task20-D2のD2-08「強制終了・再起動」の残件から、作成済み週
 - `D2H_05_records_after_restart.png`
 - `D2H_06_settings_after_restart.png`
 
-## CI再検証
+## CI・証跡の扱い
 
-2026-08-17確認時、2026-08-03のhead `7fb33b97051f591e7da475417102eaf28f083d0d`に紐づくiOS run #174がGitHub API上で非終端の`in_progress`を返し続け、job logも取得不能だった。正常な完了証跡としては採用せず、この文書更新commitで新しいPR CIを起動し、最新runの結果だけをD2H判定へ使用する。
-
-製品コード、正本ZIP、Schema、Migration、Seed、assetsには変更を加えない。
+- 2026-08-03のhead `7fb33b97051f591e7da475417102eaf28f083d0d`に紐づくiOS run #174はGitHub API上で正常な終端SUCCESSを確認できず、最終証跡として採用しない。
+- 後続head `12671ff97585ead9e1d10c21c3dcd9d5c9c875e0`ではFlutter #188がPASSし、iOS #175でD2H本体が通常／小型SimulatorともPASSした。ただしD2H `result.json` の`verified_cases`でD2-08だけ`D2-08`と表現され、D2-08全体PASSと誤読できる不整合が残っていたため、このheadも最終証跡にはしない。
+- head `6e7a029e58cd933c0f52bc43d880b29588672a62`で、証跡ラベルのみ`D2-08`から`D2-08-partial`へ是正した。製品コード、テスト操作、Schema、Migration、Seed、assets、v0.9.7固定ZIPは変更していない。
+- 同headではFlutter #189がSUCCESSし、iOS #176も検証を開始したが、本レビュー資料の整合性是正によりさらに新しいheadが発行される。このため#189／#176も最終判定の参考となる先行証跡に留める。
+- D2Hの正式判定には、**このレビュー資料是正後の最新headに紐づくFlutter／iOS CIだけ**を使用する。過去headの部分成功を最新headの成功へ読み替えない。
 
 ## 判定境界
 
-PASS時は次を更新候補とする。
+最新headのFlutter共通CIと、D2Hおよび既存回帰を含むiOS CIが終端SUCCESSした場合に限り、次を正式な確認範囲へ追加する。
 
-- D2-06：記録後再起動を確認範囲へ追加
-- D2-07：設定保存後再起動を確認範囲へ追加
-- D2-08：現在列挙されている作成済みメニュー、記録入力後、設定保存後を自動確認
-- D2-10：D2Hで確認した通常／小型画面範囲を追加
+- D2-06：記録済みセッション／セットのOSレベル終了後再読込を`AUTOMATED PASS（partial）`の確認範囲へ追加する。
+- D2-07：保存済み主目的設定のOSレベル終了後再読込を`AUTOMATED PASS（partial）`の確認範囲へ追加する。
+- D2-08：作成済み週間メニュー、記録済みセッション／セット、身体測定、保存済み設定の再起動ケースを`AUTOMATED PASS（partial）`の確認範囲へ追加する。D2-08全体PASSとはしない。
+- D2-10：D2Hで確認した通常サイズ／小型サイズの画面範囲を`AUTOMATED PASS（partial）`へ追加する。
 
-D2-08以外の未確認分岐、D2-11、iPhone実機、Dynamic Type詳細、native accessibilityは未完了のまま維持する。Task20-D2およびTask20-B全体も未完了とする。
+次は未完了のまま維持する。
+
+- D2-08のその他の中断状態、休憩タイマー、日付またぎ等の未確認分岐
+- D2-09の匿名ID旧新差分、削除／保持対象の完全確認、初期化直後再起動等の残件
+- D2-10の未網羅画面、キーボード、全ダイアログ、横スクロール等
+- D2-11文字拡大
+- iPhone実機
+- Dynamic Type詳細
+- native accessibility
+- Task20-D2全体
+- Task20-B全体
+
+PR #17は最新headの全必須CI・証跡が揃うまでDraft／未マージを維持し、部分自動受入を全体完了へ拡張しない。
