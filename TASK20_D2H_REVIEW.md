@@ -37,6 +37,12 @@ Task20-D2のD2-08「強制終了・再起動」の残件から、作成済み週
 - `D2H_05_records_after_restart.png`
 - `D2H_06_settings_after_restart.png`
 
+## CI再検証
+
+2026-08-17確認時、2026-08-03のhead `7fb33b97051f591e7da475417102eaf28f083d0d`に紐づくiOS run #174がGitHub API上で非終端の`in_progress`を返し続け、job logも取得不能だった。正常な完了証跡としては採用せず、この文書更新commitで新しいPR CIを起動し、最新runの結果だけをD2H判定へ使用する。
+
+製品コード、正本ZIP、Schema、Migration、Seed、assetsには変更を加えない。
+
 ## 判定境界
 
 PASS時は次を更新候補とする。
