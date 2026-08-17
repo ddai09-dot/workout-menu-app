@@ -53,6 +53,20 @@ void main() {
       expect(dashboard.latestWeightKg, 65.4);
       expect(dashboard.latestBodyFatPercent, 18.7);
 
+      // D2F established the exact fixture before restart. Verify that the
+      // persisted record content, not only its row counts, survives restart.
+      final session = dashboard.recentSessions.single;
+      expect(session.statusCode, 'PARTIAL');
+      expect(session.focusText, '全身A');
+      expect(session.exerciseCount, 1);
+      expect(session.workSetCount, 1);
+      expect(session.hadPain, isFalse);
+      final detail = await recordsRepository.loadWorkoutDetail(session.sessionId);
+      expect(detail.exercises, hasLength(2));
+      expect(detail.exercises.first.name, 'プッシュアップ');
+      expect(detail.exercises.first.sets, hasLength(1));
+      expect(detail.exercises.first.sets.single.reps, 8);
+
       final measurements = await recordsRepository.loadBodyMeasurements();
       expect(measurements, hasLength(1));
       expect(measurements.single.weightKg, 65.4);
