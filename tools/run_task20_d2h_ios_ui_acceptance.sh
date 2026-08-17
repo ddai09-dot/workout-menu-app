@@ -312,7 +312,7 @@ result = {
     "app_directory": os.environ["APP_DIR"],
     "bundle_id": os.environ["BUNDLE_ID"],
     "devices": devices,
-    "verified_cases": ["D2-06-partial", "D2-07-partial", "D2-08", "D2-10-partial"],
+    "verified_cases": ["D2-06-partial", "D2-07-partial", "D2-08-partial", "D2-10-partial"],
     "verified_behaviors": [
         "finalized weekly menu persists after OS-level process termination",
         "partial workout record persists after restart",
