@@ -75,12 +75,26 @@ void main() {
       final settings = await settingsRepository.load();
       expect(settings.draft.primaryGoalCode, 'STRENGTH');
 
-      final menuCountRow = await database.customSelect('''
-        SELECT COUNT(*) AS row_count
+      // A surviving row alone is not enough for the D2H finalized-menu case.
+      // Verify that the single undeleted menu is still finalized and active
+      // after the OS-level process termination and restart.
+      final menuStateRow = await database.customSelect('''
+        SELECT
+          COUNT(*) AS row_count,
+          SUM(
+            CASE
+              WHEN status_code = 'FINALIZED'
+                AND is_active = 1
+                AND finalized_at IS NOT NULL
+              THEN 1
+              ELSE 0
+            END
+          ) AS finalized_active_count
         FROM weekly_menu
         WHERE deleted_at IS NULL
       ''').getSingle();
-      expect(menuCountRow.read<int>('row_count'), 1);
+      expect(menuStateRow.read<int>('row_count'), 1);
+      expect(menuStateRow.read<int>('finalized_active_count'), 1);
 
       expectHealthyFrame(tester);
       await binding.takeScreenshot('D2H_03_home_after_restart');
