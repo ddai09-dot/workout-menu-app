@@ -122,8 +122,8 @@ path = Path(sys.argv[1])
 marker = sys.argv[2] + "="
 found = None
 for line in path.read_text(encoding="utf-8", errors="replace").splitlines():
-    if line.startswith(marker):
-        found = json.loads(line[len(marker):])
+    if marker in line:
+        found = json.loads(line.split(marker, 1)[1])
 if found is None:
     raise SystemExit(f"metadata marker not found: {marker}")
 print(json.dumps(found, ensure_ascii=False, sort_keys=True))
