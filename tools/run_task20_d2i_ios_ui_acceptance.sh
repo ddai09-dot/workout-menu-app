@@ -115,17 +115,54 @@ extract_metadata() {
   local marker="$2"
   python3 - "$log_file" "$marker" <<'PY'
 import json
+import re
 import sys
 from pathlib import Path
 
 path = Path(sys.argv[1])
-marker = sys.argv[2] + "="
-found = None
+marker = sys.argv[2]
+legacy_prefix = marker + "="
+chunk_pattern = re.compile(
+    re.escape(marker) + r"_CHUNK_(\d+)_OF_(\d+)=(.*)$"
+)
+legacy_text = None
+chunks = {}
+expected_total = None
 for line in path.read_text(encoding="utf-8", errors="replace").splitlines():
-    if marker in line:
-        found = json.loads(line.split(marker, 1)[1])
-if found is None:
+    if legacy_prefix in line:
+        legacy_text = line.split(legacy_prefix, 1)[1]
+    match = chunk_pattern.search(line)
+    if match:
+        index = int(match.group(1))
+        total = int(match.group(2))
+        if index < 1 or total < 1 or index > total:
+            raise SystemExit(f"invalid metadata chunk index: {index}/{total}")
+        if expected_total is None:
+            expected_total = total
+        elif total != expected_total:
+            raise SystemExit(
+                f"inconsistent metadata chunk total: {total} != {expected_total}"
+            )
+        if index in chunks:
+            raise SystemExit(f"duplicate metadata chunk index: {index}")
+        chunks[index] = match.group(3)
+
+if chunks:
+    expected = set(range(1, expected_total + 1))
+    actual = set(chunks)
+    if actual != expected:
+        missing = sorted(expected - actual)
+        extra = sorted(actual - expected)
+        raise SystemExit(
+            f"metadata chunks incomplete: missing={missing} extra={extra}"
+        )
+    encoded = "".join(chunks[index] for index in range(1, expected_total + 1))
+    found = json.loads(encoded)
+elif legacy_text is not None:
+    found = json.loads(legacy_text)
+else:
     raise SystemExit(f"metadata marker not found: {marker}")
+
 print(json.dumps(found, ensure_ascii=False, sort_keys=True))
 PY
 }
