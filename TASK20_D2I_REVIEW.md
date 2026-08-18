@@ -31,13 +31,13 @@ iOS #187 showed that Onboarding could use a DB account/profile while local reset
 
 ### v0.9.8 Onboarding restart/scope defect
 
-iOS #196 regular Phase 1 passed the strengthened reset deletion contract and OS terminate. Phase 2 then failed because an `IN_PROGRESS / INTRO` draft was treated as resumable and Onboarding profile/draft/account lookup was not current-user scoped. v0.9.9 fixed that product boundary while preserving D2C resume from `BASIC_INFO` and later.
+iOS #196 regular Phase 1 passed the strengthened reset deletion contract and OS terminate. Phase 2 then failed because an `IN_PROGRESS / INTRO` draft was treated as resumable and Onboarding profile/draft/account lookup was not current-user scoped. v0.9.9 fixed that product boundary while preserving D2C resume behavior from `BASIC_INFO` and later.
 
 ## v0.9.9 current-head CI result
 
 Head `a9aa037f8a336a0f1a633ae5f22408208292d213` ran Flutter #212 and iOS #199 on the same commit.
 
-Both lanes passed deterministic v0.9.9 build/verify. Both then failed in `Run Task 20-B Flutter checks` before D1 or D2I runtime. Strict Analyzer reported the same four `ambiguous_import` errors in `test/features/onboarding/data/local_onboarding_repository_test.dart`: `OnboardingDraft` was visible from both generated `app_database.dart` and the domain `onboarding_draft.dart`.
+Both lanes passed deterministic v0.9.9 build/verify. Both then failed in `Run Task 20-B Flutter checks` before D1 or D2I runtime. Strict Analyzer reported the same four `ambiguous_import` errors in `test/features/onboarding/data/local_onboarding_repository_test.dart`: `OnboardingDraft` was visible from both generated `app_database.dart` and domain `onboarding_draft.dart`.
 
 This is classified as a test-source/analyzer-gate failure, not a D2I product-runtime failure. No v0.9.9 D1/D2I Simulator acceptance result is claimed from #212/#199.
 
@@ -51,7 +51,7 @@ v0.9.9 remains immutable. v0.9.10 changes only the regression-test import plus v
 - Schema, Migration, Seed, assets, and D2I acceptance conditions are unchanged
 - expected Flutter Test count remains 56
 
-Local static verification passed the complete 26-step `make verify` set (the long invocation was split after environment timeout, with every remaining step executed and passed), plus deterministic v0.9.10 build/verify.
+Local static verification passed the complete 26-step `make verify` set (the long invocation was split after the local environment timeout; every remaining step was executed and passed), plus deterministic v0.9.10 build/verify.
 
 ## Acceptance model
 
