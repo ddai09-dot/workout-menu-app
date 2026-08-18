@@ -63,8 +63,15 @@ void main() {
         schema.preservedTables,
       );
       final preResetAccountIds = await d2iUserAccountIds(runtime.database);
-      expect(preResetAccountIds, contains(oldUserId));
-      expect(preResetAccountIds, contains(d2iOtherUserId));
+      final expectedPreResetAccountIds = <String>[
+        oldUserId,
+        d2iOtherUserId,
+      ]..sort();
+      expect(
+        preResetAccountIds,
+        expectedPreResetAccountIds,
+        reason: 'D2I fixture must not contain an extra anonymous account before reset',
+      );
       await d2iAssertOtherUserPreserved(runtime.database);
       expect(await d2iForeignKeyViolationCount(runtime.database), 0);
 
