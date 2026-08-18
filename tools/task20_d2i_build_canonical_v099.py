@@ -37,15 +37,17 @@ def main() -> int:
 
     source = Path(sys.argv[1]).resolve()
     output = Path(sys.argv[2]).resolve()
-    payload_path = Path(__file__).with_name("task20_d2i_v099.patch.gz.b64")
+    payload_dir = Path(__file__).parent
+    payload_parts = sorted(payload_dir.glob("task20_d2i_v099.patch.gz.b64.part*"))
     if not source.is_dir():
         raise SystemExit(f"Input app root does not exist: {source}")
     if "version: 0.9.8+26" not in (source / "pubspec.yaml").read_text(encoding="utf-8"):
         raise SystemExit("Task20-D2I v0.9.9 builder requires canonical v0.9.8 input")
-    if not payload_path.is_file():
-        raise SystemExit(f"Patch payload is missing: {payload_path}")
+    if len(payload_parts) != 8:
+        raise SystemExit(f"Patch payload chunk count mismatch: {len(payload_parts)} != 8")
 
-    compressed = base64.b64decode(payload_path.read_text(encoding="utf-8"))
+    payload_text = "".join(part.read_text(encoding="utf-8").strip() for part in payload_parts)
+    compressed = base64.b64decode(payload_text, validate=True)
     compressed_sha = hashlib.sha256(compressed).hexdigest()
     if compressed_sha != EXPECTED_PATCH_GZIP_SHA256:
         raise SystemExit(
