@@ -4,7 +4,7 @@ import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:crypto/crypto.dart';
-import 'package:drift/drift.dart';
+import 'package:drift/drift.dart' hide isNull;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -428,7 +428,9 @@ Future<void> d2iWaitForText(
   final deadline = DateTime.now().add(timeout);
   while (DateTime.now().isBefore(deadline)) {
     await tester.pump(const Duration(milliseconds: 250));
-    if (finder.evaluate().isNotEmpty) return;
+    if (finder.evaluate().isNotEmpty) {
+      return;
+    }
   }
   throw TestFailure('Timed out waiting for text: $text');
 }
@@ -445,7 +447,9 @@ Future<void> d2iWaitForIntroStable(
     await tester.pump(const Duration(milliseconds: 250));
     if (title.evaluate().isNotEmpty && start.evaluate().isNotEmpty) {
       stable += 1;
-      if (stable >= 8) return;
+      if (stable >= 8) {
+        return;
+      }
     } else {
       stable = 0;
     }
