@@ -503,5 +503,16 @@ void d2iExpectHealthyFrame(WidgetTester tester) {
 }
 
 void d2iPrintMetadata(String phase, Map<String, Object?> payload) {
-  print('D2I_${phase}_METADATA=${jsonEncode(payload)}');
+  const maxChunkLength = 600;
+  final encoded = jsonEncode(payload);
+  final totalChunks = (encoded.length + maxChunkLength - 1) ~/ maxChunkLength;
+  for (var index = 0; index < totalChunks; index += 1) {
+    final start = index * maxChunkLength;
+    final end = start + maxChunkLength < encoded.length
+        ? start + maxChunkLength
+        : encoded.length;
+    print(
+      'D2I_${phase}_METADATA_CHUNK_${index + 1}_OF_$totalChunks=${encoded.substring(start, end)}',
+    );
+  }
 }
