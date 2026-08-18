@@ -177,6 +177,16 @@ jobs:
             bash tools/task20_d1_ios_launch_smoke.sh \
             "$GITHUB_WORKSPACE/app/build/ios/iphonesimulator/Runner.app"
 
+      - name: Run Task 20-D2I local data reset acceptance
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          TASK20_D2I_PHASE1_TIMEOUT_SECONDS=1200 \
+          TASK20_D2I_PHASE2_TIMEOUT_SECONDS=600 \
+          TASK20_D2I_LOG_DIR="$GITHUB_WORKSPACE/app/build/task20_d2i_local_data_reset" \
+            bash tools/run_task20_d2i_ios_ui_acceptance.sh \
+            "$GITHUB_WORKSPACE/app"
+
       - name: Run Task 20-D2G My Page settings acceptance
         shell: bash
         run: |
@@ -247,7 +257,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: task20-b2-ios-evidence-${{ github.run_id }}
+          name: task20-b2-ios-evidence-${{ github.run_id }}-attempt-${{ github.run_attempt }}
           path: |
             implementation-v0.9.2.zip
             implementation-v0.9.3.zip
@@ -258,6 +268,7 @@ jobs:
             app/build/task20_b_logs/ios
             app/build/task20_b_logs/flutter
             app/build/task20_d1_ios_launch_smoke
+            app/build/task20_d2i_local_data_reset
             app/build/task20_d2a_ios_ui_acceptance
             app/build/task20_d2c_onboarding_resume
             app/build/task20_d2d_weekly_planner_resume
