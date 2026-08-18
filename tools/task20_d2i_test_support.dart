@@ -1,7 +1,6 @@
 // ignore_for_file: avoid_print
 
 import 'dart:convert';
-import 'dart:typed_data';
 
 import 'package:crypto/crypto.dart';
 import 'package:drift/drift.dart' hide isNull;
@@ -307,14 +306,25 @@ Future<Map<String, String>> d2iPreservedFingerprints(
 }
 
 Object? d2iNormalizeSqliteValue(Object? value) {
-  if (value == null) return const <String, Object?>{'type': 'null', 'value': null};
+  if (value == null) {
+    return const <String, Object?>{'type': 'null', 'value': null};
+  }
   if (value is Uint8List) {
     return <String, Object?>{'type': 'blob', 'value': base64Encode(value)};
   }
-  if (value is int) return <String, Object?>{'type': 'int', 'value': value};
-  if (value is double) return <String, Object?>{'type': 'double', 'value': value};
-  if (value is String) return <String, Object?>{'type': 'text', 'value': value};
-  return <String, Object?>{'type': value.runtimeType.toString(), 'value': value.toString()};
+  if (value is int) {
+    return <String, Object?>{'type': 'int', 'value': value};
+  }
+  if (value is double) {
+    return <String, Object?>{'type': 'double', 'value': value};
+  }
+  if (value is String) {
+    return <String, Object?>{'type': 'text', 'value': value};
+  }
+  return <String, Object?>{
+    'type': value.runtimeType.toString(),
+    'value': value.toString(),
+  };
 }
 
 Future<void> d2iInsertContractFixtures(
