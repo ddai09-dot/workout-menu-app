@@ -82,11 +82,14 @@ void main() {
       );
       await d2iScrollUntilTextVisible(tester, '端末内データを削除');
 
-      final resetButton = find.widgetWithText(FilledButton, '端末内データを削除');
+      final resetButton = find.ancestor(
+        of: find.text('端末内データを削除'),
+        matching: find.bySubtype<ButtonStyleButton>(),
+      );
       expect(resetButton, findsOneWidget);
-      expect(tester.widget<FilledButton>(resetButton).onPressed, isNull);
+      expect(tester.widget<ButtonStyleButton>(resetButton).onPressed, isNull);
       await d2iTapText(tester, '削除したデータは元に戻せないことを確認しました');
-      expect(tester.widget<FilledButton>(resetButton).onPressed, isNotNull);
+      expect(tester.widget<ButtonStyleButton>(resetButton).onPressed, isNotNull);
       d2iExpectHealthyFrame(tester);
       await binding.takeScreenshot('D2I_01_reset_ready');
 
