@@ -11,63 +11,47 @@ The acceptance baseline remains D2I design v0.6. Acceptance conditions are not r
 - base main: `60adb0f2b5f3de27b5009d19727f29b8dfe5667a`
 - current main canonical: implementation v0.9.7 / app 0.9.7+25
 - D2I design baseline: v0.6
-- historical v0.9.7 remains immutable
-- v0.9.8 is retained as the first D2I product-fix candidate and is not overwritten
-- current candidate: implementation v0.9.9 / app 0.9.9+27
-- v0.9.9 ZIP SHA-256: `82186032482561daf7b56cfeeb8fdb5fd318aa294198af1abb65e72d2c123016`
-- v0.9.9 runtime tree: `120ce9febc4a30d54909f04ba9f394aba2921c35e86237ac11a37708e7beb302`
+- v0.9.7 remains immutable main history
+- v0.9.8 remains the first D2I product-fix candidate and is not overwritten
+- v0.9.9 remains the Onboarding-scope product-fix candidate and is not overwritten
+- current candidate: implementation v0.9.10 / app 0.9.10+28
+- v0.9.10 ZIP SHA-256: `9fce3c9dd234fcc669ed7e5b62b8b2d612b3fa80b634bca14406cf5c6bb4836f`
+- v0.9.10 runtime tree (`lib` + `test`): `739b2f5dae66f86a9e6b368b1ba7c440684c650f67843d9834d107c20ce21e6a`
+- v0.9.10 product `lib` tree: `0d13db6a7af6d8cbaaa25120b24fbfb3504f236c6168a2a24eb2705efc316570` (identical to v0.9.9)
 - Schema v9 / 75 app tables
 - Schema tree: `bc1dcc6000defb6bde64156e6f019056bf983bcc185cfda108c1635cb754f4af`
 - assets tree: `cb0c88dc1b40ded797d647904f19b25916cfb8e0c1f3980b141823530ac529fe`
-- v0.9.9 patch SHA-256: `0f2272ce052aaeabd546e0ccf8fc6a52a98b6cc83454ab903858eab76538952c`
+- v0.9.10 patch SHA-256: `b94f356d1f358a1b8452a8c5b08cfcb678feebd4520ee807a6df54e1d53ef5d4`
 
-## Defect 1 discovered from v0.9.7
+## Product defects discovered by D2I
 
-Earlier iOS run #187 reached D2I runtime but failed before reset fixture verification. Investigation found that Onboarding could create a DB account/profile while `LocalAccountRepository` could create a different anonymous account when Secure Storage `current_user_id` was missing. The visible user and reset deletion target could therefore diverge.
+### v0.9.7 identity split
 
-v0.9.8 fixed current-account recovery by reusing a unique active, undeleted account with a completed profile and refusing to guess when multiple completed candidates exist. Four regression tests were added. Schema, Migration, Seed, assets, and the 53-table deletion allowlist remained unchanged.
+iOS #187 showed that Onboarding could use a DB account/profile while local reset resolved another Secure Storage-backed anonymous account. v0.9.8 introduced deterministic recovery of a unique completed local account and refuses ambiguous recovery.
 
-## iOS #196 result and Defect 2
+### v0.9.8 Onboarding restart/scope defect
 
-Current-head predecessor `e4cafb880491341ed4d43d39c29a83266d47b24f` produced Flutter #209 SUCCESS and iOS #196 FAILURE.
+iOS #196 regular Phase 1 passed the strengthened reset deletion contract and OS terminate. Phase 2 then failed because an `IN_PROGRESS / INTRO` draft was treated as resumable and Onboarding profile/draft/account lookup was not current-user scoped. v0.9.9 fixed that product boundary while preserving D2C resume from `BASIC_INFO` and later.
 
-In #196 regular Simulator Phase 1:
+## v0.9.9 current-head CI result
 
-- v0.9.8 build/verify passed
-- D2I overlay analyzer passed with zero issues
-- reset UI execution passed
-- old-user rows across all 53 user-owned tables were zero after reset
-- pre-reset old row IDs remaining were zero
-- replacement anonymous ID was created
-- foreign-key check was zero
-- the strengthened pre-reset account-set assertion passed
-- `xcrun simctl terminate` completed and Phase 2 started as a separate `flutter drive`
+Head `a9aa037f8a336a0f1a633ae5f22408208292d213` ran Flutter #212 and iOS #199 on the same commit.
 
-Phase 2 then failed with `Timed out waiting for stable onboarding intro.` This is not classified as a permitted launch/debug-connect retry because the application had launched and the product-state expectation itself was not met.
+Both lanes passed deterministic v0.9.9 build/verify. Both then failed in `Run Task 20-B Flutter checks` before D1 or D2I runtime. Strict Analyzer reported the same four `ambiguous_import` errors in `test/features/onboarding/data/local_onboarding_repository_test.dart`: `OnboardingDraft` was visible from both generated `app_database.dart` and the domain `onboarding_draft.dart`.
 
-Artifact and source inspection identified two Onboarding scope defects:
+This is classified as a test-source/analyzer-gate failure, not a D2I product-runtime failure. No v0.9.9 D1/D2I Simulator acceptance result is claimed from #212/#199.
 
-1. Showing the reset destination `/onboarding` creates an `IN_PROGRESS` draft at `INTRO`. On restart, `loadStatus()` treated that intro-only draft as resumable progress, so the app no longer remained at the clean intro state required after reset.
-2. `LocalOnboardingRepository` used global profile/draft/account lookups instead of the current account identity. With another preserved user present, Onboarding state or a newly created draft could be associated with the wrong local account.
+## v0.9.10 candidate
 
-## v0.9.9 fix
+v0.9.9 remains immutable. v0.9.10 changes only the regression-test import plus version/document/verifier traceability:
 
-v0.9.9 keeps the D2I acceptance contract unchanged and fixes the product boundary instead:
+- generated DB `OnboardingDraft` is hidden from the `app_database.dart` test import
+- domain `OnboardingDraft` remains the intended test type
+- product `lib/` tree is byte-identical to v0.9.9
+- Schema, Migration, Seed, assets, and D2I acceptance conditions are unchanged
+- expected Flutter Test count remains 56
 
-- Onboarding status and draft operations resolve the current user through `AccountRepository`.
-- Completed-profile, draft-read, draft-write, and completion queries are scoped by that current user ID.
-- An `IN_PROGRESS` draft whose current step is only `INTRO` is treated as `notStarted` rather than resumable progress.
-- `BASIC_INFO` and later drafts remain resumable, preserving D2C behavior.
-- The global "oldest active account" fallback is removed from the Onboarding path.
-
-Four regression tests cover:
-
-- another user's completed profile does not mark the current user complete
-- intro-only current-user draft is `notStarted`
-- advanced current-user draft remains `inProgress`
-- `loadOrCreateDraft()` creates/uses only the current account even when another user exists
-
-Local static verification passed for the 26 `make verify` checks, Onboarding contract, local-data-reset contract, project consistency, Task20-B execution-lane contract, deterministic v0.9.9 builder, and v0.9.9 verifier. Flutter analyzer/unit tests and iOS runtime acceptance remain CI-only formal evidence.
+Local static verification passed the complete 26-step `make verify` set (the long invocation was split after environment timeout, with every remaining step executed and passed), plus deterministic v0.9.10 build/verify.
 
 ## Acceptance model
 
@@ -88,18 +72,19 @@ Four screenshots per device, eight total:
 
 ## Result boundary
 
-D2I remains Pending until the current v0.9.9 Head passes:
+D2I remains Pending until the current v0.9.10 Head passes:
 
 - Flutter/common CI on that exact Head
-- deterministic v0.9.9 build/verify
+- deterministic v0.9.10 build/verify
+- strict analyzer and all 56 Flutter tests
 - both regular and compact Simulator D2I Phase 1/2
 - all existing iOS regression acceptance steps
-- clean analyzer and dependency gates
+- analyzer/dependency gates
 - result JSON/log inspection
 - all 8 D2I PNGs and Artifact integrity inspection
 
 Only after those checks may D2-09 become `AUTOMATED PASS` for the defined Simulator scope and D2-10 gain the D2I screen increment.
 
-Even after D2I passes, the following remain incomplete: reset interruption between Secure Storage switch and DB commit (separate D2-08 case), D2-10 untested portions, D2-11, physical iPhone, Dynamic Type detail, native accessibility, Task20-D2 overall, and Task20-B overall.
+Even after D2I passes, reset interruption between Secure Storage switch and DB commit (separate D2-08), D2-10 untested portions, D2-11, physical iPhone, Dynamic Type detail, native accessibility, Task20-D2 overall, and Task20-B overall remain incomplete.
 
 PR #18 remains Draft and unmerged until an explicit later decision.

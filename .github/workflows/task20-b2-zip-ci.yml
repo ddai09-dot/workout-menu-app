@@ -150,6 +150,20 @@ jobs:
         shell: bash
         run: python3 tools/task20_d2i_verify_canonical_v099.py app
 
+      - name: Build Task 20-D2I canonical v0.9.10 package
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          python3 tools/task20_d2i_build_canonical_v0910.py app implementation-v0.9.10.zip
+          rm -rf app && mkdir app
+          unzip -q implementation-v0.9.10.zip -d app
+          test -f app/pubspec.yaml
+          test -f app/FILE_MANIFEST.txt
+
+      - name: Verify Task 20-D2I canonical v0.9.10 package
+        shell: bash
+        run: python3 tools/task20_d2i_verify_canonical_v0910.py app
+
       - name: Install pinned Flutter SDK from official archive
         id: flutter-sdk
         shell: bash
@@ -201,6 +215,7 @@ jobs:
             implementation-v0.9.7.zip
             implementation-v0.9.8.zip
             implementation-v0.9.9.zip
+            implementation-v0.9.10.zip
             app/build/task20_b_logs/flutter
             app/pubspec.yaml
             app/pubspec.lock

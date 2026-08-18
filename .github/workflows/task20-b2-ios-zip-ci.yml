@@ -42,6 +42,7 @@ jobs:
             implementation-v0.9.7.zip
             implementation-v0.9.8.zip
             implementation-v0.9.9.zip
+            implementation-v0.9.10.zip
             app/build/task20_b_logs/ios
             app/build/task20_b_logs/flutter
             app/build/task20_d1_ios_launch_smoke

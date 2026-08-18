@@ -40,8 +40,10 @@ build_and_extract tools/task20_d2i_build_canonical_v098.py implementation-v0.9.8
 python3 tools/task20_d2i_verify_canonical_v098.py app
 build_and_extract tools/task20_d2i_build_canonical_v099.py implementation-v0.9.9.zip
 python3 tools/task20_d2i_verify_canonical_v099.py app
+build_and_extract tools/task20_d2i_build_canonical_v0910.py implementation-v0.9.10.zip
+python3 tools/task20_d2i_verify_canonical_v0910.py app
 
-test "$(shasum -a 256 implementation-v0.9.9.zip | awk '{print $1}')" = "82186032482561daf7b56cfeeb8fdb5fd318aa294198af1abb65e72d2c123016"
+test "$(shasum -a 256 implementation-v0.9.10.zip | awk '{print $1}')" = "9fce3c9dd234fcc669ed7e5b62b8b2d612b3fa80b634bca14406cf5c6bb4836f"
 
 result_file="app/build/task20_b_logs/ios/flutter_sdk_install.json"
 mkdir -p "$(dirname "$result_file")"
