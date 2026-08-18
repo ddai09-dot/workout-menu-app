@@ -2,100 +2,80 @@
 
 ## Purpose
 
-Automate the remaining Simulator acceptance for D2-09 local-data reset and fix the current-user identity defect discovered by the acceptance itself. The final acceptance must verify physical deletion of the current user's persisted rows, replacement anonymous identity, preservation of non-user content and another user, and non-resurrection after an OS-level process termination and separate relaunch.
+Automate the remaining Simulator acceptance for D2-09 local-data reset. D2I must prove physical deletion of the current user's local rows, replacement anonymous identity, preservation of non-user content and another user, and non-resurrection after an OS-level process termination and separate relaunch.
 
-## Baseline and product promotion
+The acceptance baseline remains D2I design v0.6. Acceptance conditions are not relaxed to fit implementation behavior.
+
+## Baseline and candidate history
 
 - base main: `60adb0f2b5f3de27b5009d19727f29b8dfe5667a`
-- previous canonical: implementation v0.9.7 / app 0.9.7+25
-- promoted candidate: implementation v0.9.8 / app 0.9.8+26
-- v0.9.8 ZIP SHA-256: `96ec3656dfe8c8d03654975d54daa7160a93788abf6f03ad8e502c0d3136726f`
-- Schema v9 / 75 app tables
-- Schema tree remains `bc1dcc6000defb6bde64156e6f019056bf983bcc185cfda108c1635cb754f4af`
-- assets tree remains `cb0c88dc1b40ded797d647904f19b25916cfb8e0c1f3980b141823530ac529fe`
-- v0.9.8 runtime tree: `21eba6d3201c7e3981e13d2f29e209c562c59f755162367ea3a0c6463952504f`
+- current main canonical: implementation v0.9.7 / app 0.9.7+25
 - D2I design baseline: v0.6
+- historical v0.9.7 remains immutable
+- v0.9.8 is retained as the first D2I product-fix candidate and is not overwritten
+- current candidate: implementation v0.9.9 / app 0.9.9+27
+- v0.9.9 ZIP SHA-256: `82186032482561daf7b56cfeeb8fdb5fd318aa294198af1abb65e72d2c123016`
+- v0.9.9 runtime tree: `120ce9febc4a30d54909f04ba9f394aba2921c35e86237ac11a37708e7beb302`
+- Schema v9 / 75 app tables
+- Schema tree: `bc1dcc6000defb6bde64156e6f019056bf983bcc185cfda108c1635cb754f4af`
+- assets tree: `cb0c88dc1b40ded797d647904f19b25916cfb8e0c1f3980b141823530ac529fe`
+- v0.9.9 patch SHA-256: `0f2272ce052aaeabd546e0ccf8fc6a52a98b6cc83454ab903858eab76538952c`
 
-Historical v0.9.7 is not overwritten. v0.9.8 is deterministically generated from v0.9.7 by a SHA-pinned compressed patch and independently verified before Flutter/iOS execution.
+## Defect 1 discovered from v0.9.7
 
-## Defect discovered by D2I
+Earlier iOS run #187 reached D2I runtime but failed before reset fixture verification. Investigation found that Onboarding could create a DB account/profile while `LocalAccountRepository` could create a different anonymous account when Secure Storage `current_user_id` was missing. The visible user and reset deletion target could therefore diverge.
 
-Current-head predecessor iOS run #187 passed the D2I overlay analyzer with zero issues and reached the regular Simulator runtime. It then failed before reset at the old-nickname fixture lookup with `Bad state: No element`.
+v0.9.8 fixed current-account recovery by reusing a unique active, undeleted account with a completed profile and refusing to guess when multiple completed candidates exist. Four regression tests were added. Schema, Migration, Seed, assets, and the 53-table deletion allowlist remained unchanged.
 
-Root cause analysis against the exact v0.9.7 source used by the run showed a real product identity split:
+## iOS #196 result and Defect 2
 
-- Onboarding creates/selects a DB `user_account` and persists `user_profile`, but does not set Secure Storage `current_user_id`.
-- `LocalAccountRepository.ensureAnonymousAccount()` previously created a new anonymous account whenever that Secure Storage key was absent.
-- Home/settings can still display the completed DB profile, while local-data reset resolves its deletion target through `LocalAccountRepository`.
+Current-head predecessor `e4cafb880491341ed4d43d39c29a83266d47b24f` produced Flutter #209 SUCCESS and iOS #196 FAILURE.
 
-Therefore the user visible in the app and the user selected for local-data deletion could diverge.
+In #196 regular Simulator Phase 1:
 
-## v0.9.8 fix
+- v0.9.8 build/verify passed
+- D2I overlay analyzer passed with zero issues
+- reset UI execution passed
+- old-user rows across all 53 user-owned tables were zero after reset
+- pre-reset old row IDs remaining were zero
+- replacement anonymous ID was created
+- foreign-key check was zero
+- the strengthened pre-reset account-set assertion passed
+- `xcrun simctl terminate` completed and Phase 2 started as a separate `flutter drive`
 
-`LocalAccountRepository` now recovers an existing local current account only under a deterministic safety rule:
+Phase 2 then failed with `Timed out waiting for stable onboarding intro.` This is not classified as a permitted launch/debug-connect retry because the application had launched and the product-state expectation itself was not met.
 
-- active, undeleted account
-- undeleted profile
-- `onboarding_completed_at IS NOT NULL`
-- exactly one completed local-account candidate
+Artifact and source inspection identified two Onboarding scope defects:
 
-If Secure Storage is absent, or points to a valid account without a completed profile, a unique completed account is restored into `current_user_id`. If no completed candidate exists, the existing anonymous-account behavior remains. If multiple completed candidates exist, the repository throws instead of guessing and risking deletion of the wrong user.
+1. Showing the reset destination `/onboarding` creates an `IN_PROGRESS` draft at `INTRO`. On restart, `loadStatus()` treated that intro-only draft as resumable progress, so the app no longer remained at the clean intro state required after reset.
+2. `LocalOnboardingRepository` used global profile/draft/account lookups instead of the current account identity. With another preserved user present, Onboarding state or a newly created draft could be associated with the wrong local account.
 
-`resetLocalData()` resolves current user through the same account path and then executes the existing 53-table child-first deletion transaction and replacement-account rotation.
+## v0.9.9 fix
 
-Four unit regression cases are added for missing Secure Storage recovery, valid-orphan Secure Storage recovery, reset after recovery, and ambiguous completed-account rejection. Schema, Migration, Seed, assets, and the 53-table deletion allowlist are unchanged.
+v0.9.9 keeps the D2I acceptance contract unchanged and fixes the product boundary instead:
 
-## Change boundary
+- Onboarding status and draft operations resolve the current user through `AccountRepository`.
+- Completed-profile, draft-read, draft-write, and completion queries are scoped by that current user ID.
+- An `IN_PROGRESS` draft whose current step is only `INTRO` is treated as `notStarted` rather than resumable progress.
+- `BASIC_INFO` and later drafts remain resumable, preserving D2C behavior.
+- The global "oldest active account" fallback is removed from the Onboarding path.
 
-PR files include:
+Four regression tests cover:
 
-- D2I integration-test overlay
-- D2I two-phase runner and driver
-- deterministic v0.9.8 canonical builder / verifier / patch payload
-- Flutter and iOS CI wiring for v0.9.8
-- this review note
+- another user's completed profile does not mark the current user complete
+- intro-only current-user draft is `notStarted`
+- advanced current-user draft remains `inProgress`
+- `loadOrCreateDraft()` creates/uses only the current account even when another user exists
 
-The product behavior change is carried only inside the new canonical v0.9.8 patch; the historical v0.9.7 ZIP remains immutable.
+Local static verification passed for the 26 `make verify` checks, Onboarding contract, local-data-reset contract, project consistency, Task20-B execution-lane contract, deterministic v0.9.9 builder, and v0.9.9 verifier. Flutter analyzer/unit tests and iOS runtime acceptance remain CI-only formal evidence.
 
 ## Acceptance model
 
-Phase 1 creates real user data through existing D2 helpers, adds focused contract fixtures, exercises reset cancel and reset confirm through the UI, then verifies the reset contract immediately. The app is kept running and the host must successfully execute `xcrun simctl terminate`.
+Phase 1 creates real data through existing D2 helpers, inserts focused preservation fixtures, executes reset cancel/confirm through the UI, verifies deletion and preservation immediately, then requires an OS-level process termination.
 
-Phase 2 starts a separate `flutter drive` on the same Simulator/data and verifies that the reset state survives process restart.
+Phase 2 uses the same Simulator and app data in a separate `flutter drive` and verifies intro state, replacement identity, Secure Storage, 53-table deletion, old row-ID disappearance, 21 preserved tables, other-user preservation, schema fingerprint, foreign keys, and absence of old nickname resurrection.
 
-Startup retries are allowed only before any screenshot for the affected phase and only for recognized launch/debug-connect infrastructure failures. Assertion failures, reset failures, data mismatches, FK violations, and process-termination failures are not retried.
-
-## Dynamic Schema checks
-
-The test derives the app-table set from `sqlite_master` and each table's columns from `PRAGMA table_info` at runtime. It requires:
-
-- 75 app tables
-- 53 tables with `user_id`
-- all 53 to have a single `id` primary key
-- 21 preserved tables plus `user_account`
-- exact name equality with the Schema v9 audit baselines from D2I design v0.6
-
-## Deletion proof
-
-Before reset the test records, for every user-owned table:
-
-- old-user row count
-- IDs of old-user rows
-
-After reset and again after restart it requires:
-
-- old-user row count = 0 in all 53 tables
-- every pre-reset old-row ID absent regardless of `user_id`
-- old `user_account` absent
-- replacement account `ANONYMOUS / ACTIVE`
-- Secure Storage `current_user_id` equals the replacement ID
-- complete `user_account` ID set equals pre-reset set minus old ID plus replacement ID
-
-This distinguishes physical deletion from merely reassigning old rows to another user ID.
-
-## Preservation proof
-
-The test inserts an `ai_faq` sentinel and another user's account/profile before baseline capture. For all 21 preserved tables it records both row count and a type-aware, order-independent SHA-256 content fingerprint. Reset and restart must leave both values unchanged. It also requires the 75-table schema fingerprint and `PRAGMA foreign_key_check` result to remain unchanged/clean.
+Startup retry remains allowed only before evidence generation and only for recognized launch/debug-connect infrastructure failures. Assertion, reset, data-contract, FK, and product-state failures are never retried.
 
 ## UI evidence
 
@@ -108,6 +88,18 @@ Four screenshots per device, eight total:
 
 ## Result boundary
 
-D2I remains Pending until the current v0.9.8 Head passes Flutter CI, both Simulator phases, the complete iOS regression sequence, and Artifact/result/PNG inspection.
+D2I remains Pending until the current v0.9.9 Head passes:
 
-A D2I PASS may promote D2-09 to `AUTOMATED PASS` for the defined Simulator acceptance scope and add D2I screens to D2-10 partial coverage. It does **not** complete Task20-D2 or Task20-B and does not verify physical iPhone, Dynamic Type detail, native accessibility, or reset interruption between Secure Storage switch and DB commit. That interruption remains a separate D2-08 case.
+- Flutter/common CI on that exact Head
+- deterministic v0.9.9 build/verify
+- both regular and compact Simulator D2I Phase 1/2
+- all existing iOS regression acceptance steps
+- clean analyzer and dependency gates
+- result JSON/log inspection
+- all 8 D2I PNGs and Artifact integrity inspection
+
+Only after those checks may D2-09 become `AUTOMATED PASS` for the defined Simulator scope and D2-10 gain the D2I screen increment.
+
+Even after D2I passes, the following remain incomplete: reset interruption between Secure Storage switch and DB commit (separate D2-08 case), D2-10 untested portions, D2-11, physical iPhone, Dynamic Type detail, native accessibility, Task20-D2 overall, and Task20-B overall.
+
+PR #18 remains Draft and unmerged until an explicit later decision.
