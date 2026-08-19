@@ -36,9 +36,9 @@ BUNDLE_ID="$(plutil -extract CFBundleIdentifier raw "$APP_BUNDLE/Info.plist")"
 test -n "$BUNDLE_ID"
 printf '%s\n' "$BUNDLE_ID" > "$LOG_DIR/bundle_id.txt"
 
-selected_line="$(awk -F '\t' '$1 == "small" { print; exit }' "$D1_DEVICE_FILE")"
+selected_line="$(awk -F '\t' '$1 == "compact" { print; exit }' "$D1_DEVICE_FILE")"
 if [[ -z "$selected_line" ]]; then
-  echo "ERROR: D2J requires the D1 small-device Simulator selection." >&2
+  echo "ERROR: D2J requires the D1 compact-role Simulator selection." >&2
   exit 2
 fi
 printf '%s\n' "$selected_line" > "$LOG_DIR/selected_device.tsv"
@@ -348,10 +348,8 @@ from pathlib import Path
 root = Path(os.environ["LOG_DIR"])
 screenshot_dir = Path(os.environ["SCREENSHOT_DIR"])
 
-
 def load(path: Path) -> dict:
     return json.loads(path.read_text(encoding="utf-8"))
-
 
 screenshots = []
 for path in sorted(screenshot_dir.glob("*.png")):
@@ -399,7 +397,7 @@ result = {
     "screenshots": screenshots,
     "verified_cases": ["D2-11"],
     "verified_behaviors": [
-        "enlarged accessibility text category applied on the small iOS Simulator",
+        "enlarged accessibility text category applied on the D1 compact-role iOS Simulator",
         "onboarding intro remains reachable and usable",
         "basic information screen remains reachable and usable",
         "weekly menu flow remains reachable and usable",

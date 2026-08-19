@@ -27,7 +27,7 @@ Simulator起動・erase後ごとに`simctl ui ... content_size accessibility-ext
 
 ## 端末
 
-D1で選択された`small` role（iPhone SE相当）を1台使用する。
+D1で選択された`compact` role（iPhone SE相当）を1台使用する。
 
 Issue #9のD2-11完了条件は最低1端末でのPASS。小型viewportと拡大文字を組み合わせ、レイアウト負荷が高い条件を正式受入対象にする。
 
