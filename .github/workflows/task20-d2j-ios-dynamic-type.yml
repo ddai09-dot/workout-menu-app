@@ -22,11 +22,12 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Rebuild canonical v0.9.7 from fixed packages
+      - name: Rebuild canonical v0.9.8 from fixed packages
         shell: bash
         run: |
           set -Eeuo pipefail
-          expected="3ba2fc7b668437208507f5277c81861a514b3be56586e10fa6a19928cf8b77b2"
+          expected_v097="3ba2fc7b668437208507f5277c81861a514b3be56586e10fa6a19928cf8b77b2"
+          expected_v098="3dad8b26599a12f09700e36ca6d7255a2d9c10e89b1917ff413780c1af9b1f44"
           expected_v091="4d6e2f77f4f18d4a9ebc19994da6039ef42d23bd0a38b7790dc1475b0a20e529"
           test "$(shasum -a 256 implementation-v0.9.1.zip | awk '{print $1}')" = "$expected_v091"
           rm -rf app
@@ -54,9 +55,14 @@ jobs:
           python3 tools/task20_d2g_verify_canonical_v096.py app
 
           python3 tools/task20_d2g_build_canonical_v097.py app implementation-v0.9.7.zip
-          test "$(shasum -a 256 implementation-v0.9.7.zip | awk '{print $1}')" = "$expected"
+          test "$(shasum -a 256 implementation-v0.9.7.zip | awk '{print $1}')" = "$expected_v097"
           rm -rf app && mkdir app && unzip -q implementation-v0.9.7.zip -d app
           python3 tools/task20_d2g_verify_canonical_v097.py app
+
+          python3 tools/task20_d2j_build_canonical_v098.py app implementation-v0.9.8.zip
+          test "$(shasum -a 256 implementation-v0.9.8.zip | awk '{print $1}')" = "$expected_v098"
+          rm -rf app && mkdir app && unzip -q implementation-v0.9.8.zip -d app
+          python3 tools/task20_d2j_verify_canonical_v098.py app
 
       - name: Install pinned Flutter SDK from official archive
         id: flutter-sdk
@@ -120,6 +126,7 @@ jobs:
           name: task20-d2j-ios-evidence-${{ github.run_id }}-attempt-${{ github.run_attempt }}
           path: |
             implementation-v0.9.7.zip
+            implementation-v0.9.8.zip
             app/build/task20_b_logs/ios
             app/build/task20_d1_ios_launch_smoke
             app/build/task20_d2j_dynamic_type
