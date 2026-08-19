@@ -4,7 +4,35 @@
 
 Task20-D2のD2-11「文字拡大」を、既存の受入済み主要導線を再利用してGitHub-hosted iOS Simulator上で自動確認する。
 
-D2Jは**受入ハーネスのみ**を追加する。製品`lib/`、Schema、Migration、Seed、assets、固定ZIPは変更しない。対象正本はmainの実装基盤v0.9.7／アプリ0.9.7+25、Schema v9／75テーブルとする。
+当初は受入ハーネスのみでmain正本v0.9.7／0.9.7+25を検証したが、正式D2J runで製品レイアウト不具合を検出した。そのため現在は、v0.9.7を変更せず、必要最小限の製品修正を積んだ**正本候補v0.9.8／0.9.8+26**をD2Jおよび標準回帰で再検証する。Schemaはv9／75テーブルのまま、Migration、Seed、assetsは変更しない。
+
+## v0.9.7で検出した正式FAIL
+
+PR Head `d837ebf1cfaba0e20f990673720fd9c345e6728e` のTask20-D2J run #3（run `32201825637`）で、以下を確認した。
+
+- 固定v0.9.7 SHA-256：`3ba2fc7b668437208507f5277c81861a514b3be56586e10fa6a19928cf8b77b2`
+- Task20-B iOS Simulator checks：PASS
+- D1：iPhone 16 Pro／iPhone SE（3rd generation）ともPASS
+- iPhone SE（3rd generation）へ`accessibility-extra-large`設定：成功
+- D2A：初期登録を最後まで完了し、ホームの「今日やること」表示まで到達
+- ホーム表示直後のhealthy-frame確認で`A RenderFlex overflowed by 192 pixels on the bottom.`を検出
+- これはstartup infrastructure failureではなく製品layout failureのため再試行せずFAIL
+
+FAIL Artifact：ID `9348172126`、digest `sha256:cfcc99a85a040a803e45f64a04260b1fdf05ab38f97377a233ab70c2a8a0c95b`。
+
+## v0.9.8修正内容
+
+原因はHomeのTodayActionカードが固定viewport内の非スクロール`Column`で`Spacer()`を使用しており、拡大文字時にタイトル・説明・CTAの必要高が小型画面高を超えることだった。
+
+v0.9.8ではHomeのTodayAction表示だけを次のように変更する。
+
+- TodayAction領域を`SingleChildScrollView`で縦スクロール可能にする
+- カード内`Column`を`mainAxisSize: MainAxisSize.min`にする
+- 高さを消費する`Spacer()`を固定間隔`SizedBox(height: 24)`へ置き換える
+
+文言、CTA、遷移先、TodayActionの判定ロジックは変更しない。Schema／Migration／Seed／assetsも変更しない。
+
+正本候補v0.9.8の決定論的ZIP SHA-256は`3dad8b26599a12f09700e36ca6d7255a2d9c10e89b1917ff413780c1af9b1f44`。v0.9.7からのtree比較ではSchema hashとassets hashは完全一致し、runtimeだけが意図どおり変化する。
 
 ## 判定対象
 
@@ -64,15 +92,16 @@ startup infrastructure failureのみ、既存D2受入と同じく「テスト開
 
 ## 正式受入条件
 
-同一PR Headで以下がすべてterminal SUCCESSであること。
+**v0.9.8を再構築する同一PR Head**で以下がすべてterminal SUCCESSであること。
 
-- 既存Flutter ZIP CI
-- 既存Task20-B2 iOS ZIP Integration（標準文字サイズ回帰）
+- Flutter ZIP CI
+- Task20-B2 iOS ZIP Integration（標準文字サイズ回帰）
 - D2J iOS Dynamic Type Acceptance
+- analyzer／dependency gate
 - D2J Artifactのresult/log/PNG/hash監査
 - D2J全PNGの目視確認
 
-ここまで満たした場合だけD2-11を`AUTOMATED PASS`へ更新する。
+ここまで満たした場合だけD2-11を`AUTOMATED PASS`へ更新する。v0.9.7のFAIL runは原因・修正の監査証跡として保持し、PASS根拠には使用しない。
 
 ## 判定境界
 
