@@ -24,145 +24,9 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Verify and extract v0.9.1 canonical package
+      - name: Rebuild and verify canonical v0.9.11
         shell: bash
-        run: |
-          set -Eeuo pipefail
-          expected="4d6e2f77f4f18d4a9ebc19994da6039ef42d23bd0a38b7790dc1475b0a20e529"
-          actual="$(sha256sum implementation-v0.9.1.zip | awk '{print $1}')"
-          test "$actual" = "$expected"
-          unzip -t implementation-v0.9.1.zip
-          rm -rf app
-          mkdir app
-          unzip -q implementation-v0.9.1.zip -d app
-          test -f app/pubspec.yaml
-          test -f app/FILE_MANIFEST.txt
-
-      - name: Build Task 20-C5 canonical v0.9.2 package
-        shell: bash
-        run: |
-          set -Eeuo pipefail
-          python3 tools/task20_c5_build_canonical_v092.py \
-            app implementation-v0.9.2.zip
-          rm -rf app
-          mkdir app
-          unzip -q implementation-v0.9.2.zip -d app
-          test -f app/pubspec.yaml
-          test -f app/FILE_MANIFEST.txt
-
-      - name: Verify Task 20-C5 canonical package
-        shell: bash
-        run: |
-          set -Eeuo pipefail
-          python3 tools/task20_c5_verify_canonical_package.py app
-
-      - name: Build Task 20-D2A canonical v0.9.3 package
-        shell: bash
-        run: |
-          set -Eeuo pipefail
-          python3 tools/task20_d2a_build_canonical_v093.py \
-            app implementation-v0.9.3.zip
-          rm -rf app
-          mkdir app
-          unzip -q implementation-v0.9.3.zip -d app
-          test -f app/pubspec.yaml
-          test -f app/FILE_MANIFEST.txt
-
-      - name: Verify Task 20-D2A canonical package
-        shell: bash
-        run: |
-          set -Eeuo pipefail
-          python3 tools/task20_d2a_verify_canonical_v093.py app
-
-      - name: Build Task 20-D2B canonical v0.9.4 package
-        shell: bash
-        run: |
-          set -Eeuo pipefail
-          python3 tools/task20_d2b_build_canonical_v094.py \
-            app implementation-v0.9.4.zip
-          rm -rf app
-          mkdir app
-          unzip -q implementation-v0.9.4.zip -d app
-          test -f app/pubspec.yaml
-          test -f app/FILE_MANIFEST.txt
-
-      - name: Verify Task 20-D2B canonical package
-        shell: bash
-        run: |
-          set -Eeuo pipefail
-          python3 tools/task20_d2b_verify_canonical_v094.py app
-
-      - name: Build Task 20-D2E canonical v0.9.5 package
-        shell: bash
-        run: |
-          set -Eeuo pipefail
-          python3 tools/task20_d2e_build_canonical_v095.py \
-            app implementation-v0.9.5.zip
-          rm -rf app
-          mkdir app
-          unzip -q implementation-v0.9.5.zip -d app
-          test -f app/pubspec.yaml
-          test -f app/FILE_MANIFEST.txt
-
-      - name: Verify Task 20-D2E canonical package
-        shell: bash
-        run: |
-          set -Eeuo pipefail
-          python3 tools/task20_d2e_verify_canonical_v095.py app
-
-      - name: Build Task 20-D2G canonical v0.9.6 package
-        shell: bash
-        run: |
-          set -Eeuo pipefail
-          python3 tools/task20_d2g_build_canonical_v096.py \
-            app implementation-v0.9.6.zip
-          rm -rf app
-          mkdir app
-          unzip -q implementation-v0.9.6.zip -d app
-          test -f app/pubspec.yaml
-          test -f app/FILE_MANIFEST.txt
-
-      - name: Verify Task 20-D2G canonical v0.9.6 package
-        shell: bash
-        run: |
-          set -Eeuo pipefail
-          python3 tools/task20_d2g_verify_canonical_v096.py app
-
-      - name: Build Task 20-D2G canonical v0.9.7 package
-        shell: bash
-        run: |
-          set -Eeuo pipefail
-          python3 tools/task20_d2g_build_canonical_v097.py \
-            app implementation-v0.9.7.zip
-          rm -rf app
-          mkdir app
-          unzip -q implementation-v0.9.7.zip -d app
-          test -f app/pubspec.yaml
-          test -f app/FILE_MANIFEST.txt
-
-      - name: Verify Task 20-D2G canonical v0.9.7 package
-        shell: bash
-        run: |
-          set -Eeuo pipefail
-          python3 tools/task20_d2g_verify_canonical_v097.py app
-
-      - name: Build Task 20-D2J canonical v0.9.8 package
-        shell: bash
-        run: |
-          set -Eeuo pipefail
-          python3 tools/task20_d2j_build_canonical_v098.py \
-            app implementation-v0.9.8.zip
-          rm -rf app
-          mkdir app
-          unzip -q implementation-v0.9.8.zip -d app
-          test -f app/pubspec.yaml
-          test -f app/FILE_MANIFEST.txt
-
-      - name: Verify Task 20-D2J canonical v0.9.8 package
-        shell: bash
-        run: |
-          set -Eeuo pipefail
-          python3 tools/task20_d2j_verify_canonical_v098.py app
+        run: bash tools/task20_d2j_build_current_v0911.sh
 
       - name: Install pinned Flutter SDK from official archive
         id: flutter-sdk
@@ -199,8 +63,7 @@ jobs:
         shell: bash
         run: |
           set -Eeuo pipefail
-          python3 tools/task20_c4_verify_dependency_resolution.py \
-            app/pubspec.yaml app/pubspec.lock
+          python3 tools/task20_c4_verify_dependency_resolution.py app/pubspec.yaml app/pubspec.lock
 
       - name: Upload Task 20-B Flutter evidence
         if: always()
@@ -214,7 +77,8 @@ jobs:
             implementation-v0.9.5.zip
             implementation-v0.9.6.zip
             implementation-v0.9.7.zip
-            implementation-v0.9.8.zip
+            implementation-v0.9.10.zip
+            implementation-v0.9.11.zip
             app/build/task20_b_logs/flutter
             app/pubspec.yaml
             app/pubspec.lock
