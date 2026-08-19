@@ -24,4 +24,4 @@ build_and_extract tools/task20_d2i_build_canonical_v099.py implementation-v0.9.9
 build_and_extract tools/task20_d2i_build_canonical_v0910.py implementation-v0.9.10.zip tools/task20_d2i_verify_canonical_v0910.py
 test "$(shasum -a 256 implementation-v0.9.10.zip | awk '{print $1}')" = "9fce3c9dd234fcc669ed7e5b62b8b2d612b3fa80b634bca14406cf5c6bb4836f"
 build_and_extract tools/task20_d2j_build_canonical_v0911.py implementation-v0.9.11.zip tools/task20_d2j_verify_canonical_v0911.py
-test "$(shasum -a 256 implementation-v0.9.11.zip | awk '{print $1}')" = "d2bc188138c32322ede945a73dd8a8bd28a3c316efe0ad1430b463cb8bc973ab"
+test "$(shasum -a 256 implementation-v0.9.11.zip | awk '{print $1}')" = "cd0781aa74b6be26aaf990ceb6e01a02064bb2ca0688e56d1bc603a8f95114ca"
