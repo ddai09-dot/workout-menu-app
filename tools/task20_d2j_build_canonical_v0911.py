@@ -35,18 +35,45 @@ def canonical_files(root: Path) -> list[str]:
     )
 
 
-def load_patch(path: Path, expected_gzip: str, expected_raw: str) -> bytes:
-    if not path.is_file():
-        raise SystemExit(f"Patch payload is missing: {path}")
-    compressed = base64.b64decode(path.read_text(encoding="utf-8"))
+def load_patch_text(encoded: str, label: str, expected_gzip: str, expected_raw: str) -> bytes:
+    compressed = base64.b64decode(encoded)
     compressed_sha = hashlib.sha256(compressed).hexdigest()
     if compressed_sha != expected_gzip:
-        raise SystemExit(f"Compressed patch SHA mismatch: {compressed_sha} != {expected_gzip}")
+        raise SystemExit(
+            f"{label} compressed patch SHA mismatch: {compressed_sha} != {expected_gzip}"
+        )
     patch = gzip.decompress(compressed)
     raw_sha = hashlib.sha256(patch).hexdigest()
     if raw_sha != expected_raw:
-        raise SystemExit(f"Patch SHA mismatch: {raw_sha} != {expected_raw}")
+        raise SystemExit(f"{label} patch SHA mismatch: {raw_sha} != {expected_raw}")
     return patch
+
+
+def load_patch(path: Path, expected_gzip: str, expected_raw: str) -> bytes:
+    if not path.is_file():
+        raise SystemExit(f"Patch payload is missing: {path}")
+    return load_patch_text(
+        path.read_text(encoding="utf-8"),
+        path.name,
+        expected_gzip,
+        expected_raw,
+    )
+
+
+def load_chunked_patch(paths: list[Path], expected_gzip: str, expected_raw: str) -> bytes:
+    if not paths:
+        raise SystemExit("Chunked patch payload list is empty")
+    chunks: list[str] = []
+    for path in paths:
+        if not path.is_file():
+            raise SystemExit(f"Patch payload chunk is missing: {path}")
+        chunks.append(path.read_text(encoding="utf-8"))
+    return load_patch_text(
+        "".join(chunks),
+        f"{paths[0].name}..{paths[-1].name}",
+        expected_gzip,
+        expected_raw,
+    )
 
 
 def apply_patch(root: Path, patch: bytes) -> None:
@@ -101,15 +128,18 @@ def main() -> int:
     source = Path(sys.argv[1]).resolve()
     output = Path(sys.argv[2]).resolve()
     tool_dir = Path(__file__).resolve().parent
-    base_payload = tool_dir / "task20_d2j_v0910_base.patch.gz.b64"
+    base_payload_parts = [
+        tool_dir / f"task20_d2j_v0910_base.patch.gz.b64.part{index:02d}"
+        for index in range(1, 5)
+    ]
     d2j_payload = tool_dir / "task20_d2j_v0911.patch.gz.b64"
     if not source.is_dir():
         raise SystemExit(f"Input app root does not exist: {source}")
     if EXPECTED_V097_VERSION not in (source / "pubspec.yaml").read_text(encoding="utf-8"):
         raise SystemExit("v0.9.11 builder requires canonical v0.9.7 input")
 
-    base_patch = load_patch(
-        base_payload,
+    base_patch = load_chunked_patch(
+        base_payload_parts,
         EXPECTED_BASE_PATCH_GZIP_SHA256,
         EXPECTED_BASE_PATCH_SHA256,
     )
@@ -123,7 +153,6 @@ def main() -> int:
         root = Path(temporary) / "app"
         shutil.copytree(source, root)
 
-        # Reconstruct and cryptographically prove the accepted D2I v0.9.10 parent.
         apply_patch(root, base_patch)
         if EXPECTED_V0910_VERSION not in (root / "pubspec.yaml").read_text(encoding="utf-8"):
             raise SystemExit("Intermediate accepted parent is not v0.9.10+28")
@@ -137,7 +166,6 @@ def main() -> int:
         parent_output = output.with_name("implementation-v0.9.10.zip")
         shutil.copyfile(intermediate, parent_output)
 
-        # Apply only the D2J v0.9.11 delta after proving the parent bytes.
         apply_patch(root, d2j_patch)
         if EXPECTED_V0911_VERSION not in (root / "pubspec.yaml").read_text(encoding="utf-8"):
             raise SystemExit("Patched result is not v0.9.11+29")
