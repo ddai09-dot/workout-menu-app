@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Build Task20-D2J canonical v0.9.11 from accepted canonical v0.9.10."""
+"""Build Task20-D2I canonical v0.9.8 from canonical v0.9.7."""
 from __future__ import annotations
 
 import base64
@@ -13,9 +13,9 @@ import tempfile
 import zipfile
 from pathlib import Path
 
-EXPECTED_ZIP_SHA256 = "d2bc188138c32322ede945a73dd8a8bd28a3c316efe0ad1430b463cb8bc973ab"
-EXPECTED_PATCH_SHA256 = "5aa56dba53247fe7ab6cc78e0d70842eb8a03dd2df9bd7dd8a50d569cae2f099"
-EXPECTED_PATCH_GZIP_SHA256 = "d16bc87443a98e172eb20bb5f05e6f126bc809005ee6453130dcebe0d7e81ae6"
+EXPECTED_ZIP_SHA256 = "96ec3656dfe8c8d03654975d54daa7160a93788abf6f03ad8e502c0d3136726f"
+EXPECTED_PATCH_SHA256 = "05718424ba4b06eb15cdbcbce7f921992064ee2c322aa0669c51bbddac00bc71"
+EXPECTED_PATCH_GZIP_SHA256 = "dfb200abbed9a3b9964a10a1ff87ff4cb0e90ba2f0312addef8c10ea660236e0"
 EXCLUDED_TOP_LEVEL = {"build", ".dart_tool"}
 
 
@@ -32,21 +32,20 @@ def canonical_files(root: Path) -> list[str]:
 def main() -> int:
     if len(sys.argv) != 3:
         raise SystemExit(
-            "Usage: task20_d2j_build_canonical_v0911.py <v0.9.10-app-root> <output-zip>"
+            "Usage: task20_d2i_build_canonical_v098.py <v0.9.7-app-root> <output-zip>"
         )
 
     source = Path(sys.argv[1]).resolve()
     output = Path(sys.argv[2]).resolve()
-    payload_path = Path(__file__).with_name("task20_d2j_v0911.patch.gz.b64")
+    payload_path = Path(__file__).with_name("task20_d2i_v098.patch.gz.b64")
     if not source.is_dir():
         raise SystemExit(f"Input app root does not exist: {source}")
-    if "version: 0.9.10+28" not in (source / "pubspec.yaml").read_text(encoding="utf-8"):
-        raise SystemExit("Task20-D2J v0.9.11 builder requires accepted canonical v0.9.10 input")
+    if "version: 0.9.7+25" not in (source / "pubspec.yaml").read_text(encoding="utf-8"):
+        raise SystemExit("Task20-D2I v0.9.8 builder requires canonical v0.9.7 input")
     if not payload_path.is_file():
         raise SystemExit(f"Patch payload is missing: {payload_path}")
 
-    encoded = "".join(payload_path.read_text(encoding="utf-8").split())
-    compressed = base64.b64decode(encoded, validate=True)
+    compressed = base64.b64decode(payload_path.read_text(encoding="utf-8"))
     compressed_sha = hashlib.sha256(compressed).hexdigest()
     if compressed_sha != EXPECTED_PATCH_GZIP_SHA256:
         raise SystemExit(
@@ -57,7 +56,7 @@ def main() -> int:
     if patch_sha != EXPECTED_PATCH_SHA256:
         raise SystemExit(f"Patch SHA mismatch: {patch_sha} != {EXPECTED_PATCH_SHA256}")
 
-    with tempfile.TemporaryDirectory(prefix="task20-d2j-v0911-") as temporary:
+    with tempfile.TemporaryDirectory(prefix="task20-d2i-v098-") as temporary:
         root = Path(temporary) / "app"
         shutil.copytree(source, root)
         subprocess.run(
@@ -103,7 +102,7 @@ def main() -> int:
     actual = hashlib.sha256(output.read_bytes()).hexdigest()
     if actual != EXPECTED_ZIP_SHA256:
         raise SystemExit(f"ZIP SHA-256 mismatch: {actual} != {EXPECTED_ZIP_SHA256}")
-    print(f"Task20-D2J canonical package PASS: {output} sha256={actual}")
+    print(f"Task20-D2I canonical package PASS: {output} sha256={actual}")
     return 0
 
 
