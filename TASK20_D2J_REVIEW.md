@@ -89,7 +89,13 @@ D2Hの判定範囲は従来どおりD2-06/07/08/10 partialであり、Task20-D2�
 
 Head `4b6bfa304ad1e6f67baa10ff7cce92b863dca0f2` / run `32330457311`。D2H regular端末はphase1/phase2ともPASS。その後compact phase1で、My Page復帰後の`筋力を高めたい`が複数Widgetに一致し、`scrollUntilVisible`へ複数targetが渡って `Bad state: Too many elements` で停止した。Rendering Library例外や製品assertionではなくtest harnessのtarget一意性欠陥。
 
-Head `9e979678fea47a9b9c0f3f27b4a7ab308f3bb1c3`では、選択したScrollable配下の一致targetを優先し、`targets.first`を明示して1要素だけを`scrollUntilVisible`へ渡す。製品コード・D2H検査項目・受入条件は変更しない。
+Head `9e979678fea47a9b9c0f3f27b4a7ab308f3bb1c3`以降では、選択したScrollable配下の一致targetを優先し、`targets.first`を明示して1要素だけを`scrollUntilVisible`へ渡す。製品コード・D2H検査項目・受入条件は変更しない。
+
+### 標準iOS #237 — D2I screenshot reportData transport failure
+
+Head `cfcc1abff921f577a4d59d8e8cc0fafb70458663` / run `32332342244`。D2Hはregular/compactともphase1/phase2およびOS-level terminate/restartまでPASS。続くD2I regular phase1もアプリ側テストはexit 0で、`responseDataCallback`経由のmetadata chunkも取得できたが、`D2I_01_reset_ready.png` / `D2I_02_intro_after_reset.png`が生成されずrunnerがFAILした。Artifact `9394293873` / `sha256:e4ff5882f430f04c1fbbf0b91adb75ce9cb6c0f1e274380270503f0012f884e8`。
+
+Flutter 3.44.6固定refの`IntegrationTestWidgetsFlutterBinding.takeScreenshot`は`reportData['screenshots']`へ画像情報を蓄積し、`integrationDriver`は最終responseの`screenshots`を`onScreenshot`へ渡す。D2I testが最後に`binding.reportData = {...}`でmetadata mapを代入していたため、既に蓄積した`screenshots`を上書きしていた。修正は既存`reportData`を保持したまま`task` / `phase` / `metadata`キーを追加する方式とし、スクリーンショット証跡とmetadata transportを両立させる。製品コード、D2I検査条件、v0.9.13 ZIPは変更しない。
 
 ## D2J固定条件
 
