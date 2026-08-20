@@ -10,10 +10,19 @@ Future<void> scrollToTextD2G(
 }) async {
   final scrollables = find.byType(Scrollable);
   expect(scrollables, findsWidgets);
+  final scrollable = useLastScrollable ? scrollables.last : scrollables.first;
+  final targetInScrollable = find.descendant(
+    of: scrollable,
+    matching: find.text(text),
+  );
+  final targets = targetInScrollable.evaluate().isNotEmpty
+      ? targetInScrollable
+      : find.text(text);
+  expect(targets, findsWidgets);
   await tester.scrollUntilVisible(
-    find.text(text),
+    targets.first,
     delta,
-    scrollable: useLastScrollable ? scrollables.last : scrollables.first,
+    scrollable: scrollable,
   );
   await tester.pump(const Duration(milliseconds: 300));
 }
