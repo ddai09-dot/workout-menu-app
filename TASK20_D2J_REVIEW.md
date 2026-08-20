@@ -85,6 +85,12 @@ historical D2H PASSはPR #17のv0.9.7 Headに対する証跡であり、v0.9.13�
 
 D2Hの判定範囲は従来どおりD2-06/07/08/10 partialであり、Task20-D2全体PASSへ拡張しない。
 
+### 標準iOS #235 — D2H compact harness failure
+
+Head `4b6bfa304ad1e6f67baa10ff7cce92b863dca0f2` / run `32330457311`。D2H regular端末はphase1/phase2ともPASS。その後compact phase1で、My Page復帰後の`筋力を高めたい`が複数Widgetに一致し、`scrollUntilVisible`へ複数targetが渡って `Bad state: Too many elements` で停止した。Rendering Library例外や製品assertionではなくtest harnessのtarget一意性欠陥。
+
+Head `9e979678fea47a9b9c0f3f27b4a7ab308f3bb1c3`では、選択したScrollable配下の一致targetを優先し、`targets.first`を明示して1要素だけを`scrollUntilVisible`へ渡す。製品コード・D2H検査項目・受入条件は変更しない。
+
 ## D2J固定条件
 
 - D1 `compact` role（iPhone SE相当）1台
