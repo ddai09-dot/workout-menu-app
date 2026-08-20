@@ -47,20 +47,54 @@ Future<void> verifyWorkoutStartRepository(
   }
 }
 
+String _visibleTextSnapshot() {
+  return find
+      .byType(Text)
+      .evaluate()
+      .map((element) {
+        final text = element.widget as Text;
+        return text.data ?? text.textSpan?.toPlainText() ?? '';
+      })
+      .where((text) => text.trim().isNotEmpty)
+      .toSet()
+      .join(' | ');
+}
+
 Future<void> waitForWorkoutStartReady(
   IntegrationTestWidgetsFlutterBinding binding,
   WidgetTester tester,
 ) async {
   const readyText = '痛み・違和感がありますか？';
+  const primaryActionText = '予定どおり開始する';
+  const adjustmentActionText = '今日の状態を調整';
   const errorText = '今日のメニューを読み込めませんでした。';
   final deadline = DateTime.now().add(const Duration(seconds: 60));
 
   while (DateTime.now().isBefore(deadline)) {
     await tester.pump(const Duration(milliseconds: 250));
     if (find.text(readyText).evaluate().isNotEmpty) {
-      await waitForText(tester, '予定どおり開始する');
-      await waitForText(tester, '今日の状態を調整');
-      return;
+      try {
+        expectHealthyFrame(tester);
+        await scrollToText(tester, primaryActionText, delta: 200);
+        await waitForText(tester, primaryActionText);
+        await scrollToText(tester, adjustmentActionText, delta: 200);
+        await waitForText(tester, adjustmentActionText);
+        expectHealthyFrame(tester);
+        return;
+      } catch (error, stackTrace) {
+        await binding.takeScreenshot('D2E_DIAG_start_cta_unreachable');
+        final scrollableCount = find.byType(Scrollable).evaluate().length;
+        final progressCount = find
+            .byType(CircularProgressIndicator)
+            .evaluate()
+            .length;
+        throw TestFailure(
+          'Workout start summary loaded, but enlarged-text CTA reachability '
+          'failed. error=$error; scrollables=$scrollableCount; '
+          'progressIndicators=$progressCount; '
+          'visibleTexts=${_visibleTextSnapshot()}\n$stackTrace',
+        );
+      }
     }
     if (find.text(errorText).evaluate().isNotEmpty) {
       await binding.takeScreenshot('D2E_DIAG_start_load_error');
@@ -71,16 +105,6 @@ Future<void> waitForWorkoutStartReady(
   }
 
   await binding.takeScreenshot('D2E_DIAG_start_load_timeout');
-  final visibleTexts = find
-      .byType(Text)
-      .evaluate()
-      .map((element) {
-        final text = element.widget as Text;
-        return text.data ?? text.textSpan?.toPlainText() ?? '';
-      })
-      .where((text) => text.trim().isNotEmpty)
-      .toSet()
-      .join(' | ');
   final progressCount = find
       .byType(CircularProgressIndicator)
       .evaluate()
@@ -88,7 +112,7 @@ Future<void> waitForWorkoutStartReady(
   throw TestFailure(
     'Workout start summary did not become ready or show the expected error '
     'within 60 seconds. progressIndicators=$progressCount; '
-    'visibleTexts=$visibleTexts',
+    'visibleTexts=${_visibleTextSnapshot()}',
   );
 }
 
