@@ -92,19 +92,26 @@ void main() {
       d2iExpectHealthyFrame(tester);
       await binding.takeScreenshot('D2I_04_clean_basic_info_after_restart');
 
-      d2iPrintMetadata('PHASE2', <String, Object?>{
-        'old_user_id': oldUserId,
-        'new_user_id': expectedNewUserId,
-        'app_table_count': schema.appTables.length,
-        'user_owned_table_count': schema.userOwnedTables.length,
-        'preserved_table_count': schema.preservedTables.length,
-        'schema_sha256': schema.schemaSha256,
-        'pre_reset_nonzero_user_owned_table_count': nonZeroTables.length,
-        'pre_reset_nonzero_user_owned_tables': nonZeroTables,
-        'old_user_rows_remaining': postRestartCounts.values.fold<int>(0, (sum, count) => sum + count),
-        'pre_reset_old_row_ids_remaining': oldRowIdsRemaining,
-        'foreign_key_violations': 0,
-      });
+      binding.reportData = <String, dynamic>{
+        'task': 'Task20-D2I',
+        'phase': 'PHASE2',
+        'metadata': <String, Object?>{
+          'old_user_id': oldUserId,
+          'new_user_id': expectedNewUserId,
+          'app_table_count': schema.appTables.length,
+          'user_owned_table_count': schema.userOwnedTables.length,
+          'preserved_table_count': schema.preservedTables.length,
+          'schema_sha256': schema.schemaSha256,
+          'pre_reset_nonzero_user_owned_table_count': nonZeroTables.length,
+          'pre_reset_nonzero_user_owned_tables': nonZeroTables,
+          'old_user_rows_remaining': postRestartCounts.values.fold<int>(
+            0,
+            (sum, count) => sum + count,
+          ),
+          'pre_reset_old_row_ids_remaining': oldRowIdsRemaining,
+          'foreign_key_violations': 0,
+        },
+      };
 
       await runtime.secureStore.delete(d2iMetadataKey);
       expect(await runtime.secureStore.read(d2iMetadataKey), isNull);
