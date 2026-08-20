@@ -59,7 +59,7 @@ v0.9.11固定値：
 - runtime tree：`3eeb5a3357ca1ec2a42f486de1b375312f1baf64bfde1682f1f38b7bc702a71e`
 - product lib tree：`6eea4b98f6741cf7e02699cda31b8d2c5e894366e82c2b15f9c8fa287553bfdc`
 - test tree：`878bdfb548bcd42afbc3def4d7c6e680fd25432c0588c05e6a7bbf50bbfeeca5`
-- Schema tree：`bc1dcc6000defb6de64156e6f019056bf983bcc185cfda108c1635cb754f4af`
+- Schema tree：`bc1dcc6000defb6bde64156e6f019056bf983bcc185cfda108c1635cb754f4af`
 - assets tree：`cb0c88dc1b40ded797d647904f19b25916cfb8e0c1f3980b141823530ac529fe`
 - expected Flutter tests：56
 - canonical file count：306
@@ -88,7 +88,7 @@ v0.9.12では`LayoutBuilder`と`MediaQuery.textScalerOf(context)`で表示条件
 - product `lib` tree：`e5cb6241453f8792036ae52425ebc62a9f91e61f9e08b3b2afa77dd625404fc0`
 - test tree：`878bdfb548bcd42afbc3def4d7c6e680fd25432c0588c05e6a7bbf50bbfeeca5`
 - weekly planner source SHA-256：`d721ebdf5294ef02a550dff7936a19c9ea979502e9e927bbfd4b3951f8f964a7`
-- Schema tree：`bc1dcc6000defb6de64156e6f019056bf983bcc185cfda108c1635cb754f4af`
+- Schema tree：`bc1dcc6000defb6bde64156e6f019056bf983bcc185cfda108c1635cb754f4af`
 - assets tree：`cb0c88dc1b40ded797d647904f19b25916cfb8e0c1f3980b141823530ac529fe`
 - expected Flutter tests：56
 - canonical file count：306
