@@ -177,6 +177,7 @@ void main() {
       );
       await waitForText(tester, '1 / 2種目');
       expect(find.text('フォームを確認'), findsOneWidget);
+      await scrollToText(tester, 'セット完了', delta: 200);
       expect(find.text('セット完了'), findsOneWidget);
       expectHealthyFrame(tester);
       await binding.takeScreenshot('D2E_03_session');
@@ -245,6 +246,7 @@ void main() {
         timeout: const Duration(seconds: 90),
       );
       expect(find.text('全体のきつさ'), findsOneWidget);
+      await scrollToText(tester, '未完了の理由', delta: 200);
       expect(find.text('未完了の理由'), findsOneWidget);
       expectHealthyFrame(tester);
       await binding.takeScreenshot('D2E_07_assessment');
