@@ -2,29 +2,61 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 
+Offset _forwardDragOffsetD2G(AxisDirection direction, double delta) {
+  switch (direction) {
+    case AxisDirection.down:
+      return Offset(0, -delta);
+    case AxisDirection.up:
+      return Offset(0, delta);
+    case AxisDirection.right:
+      return Offset(-delta, 0);
+    case AxisDirection.left:
+      return Offset(delta, 0);
+  }
+}
+
 Future<void> scrollToTextD2G(
   WidgetTester tester,
   String text, {
   double delta = 320,
   bool useLastScrollable = false,
 }) async {
-  final scrollables = find.byType(Scrollable);
+  final scrollables = find.byType(Scrollable).hitTestable();
   expect(scrollables, findsWidgets);
-  final scrollable = useLastScrollable ? scrollables.last : scrollables.first;
-  final targetInScrollable = find.descendant(
-    of: scrollable,
-    matching: find.text(text),
-  );
-  final targets = targetInScrollable.evaluate().isNotEmpty
-      ? targetInScrollable
-      : find.text(text);
-  expect(targets, findsWidgets);
-  await tester.scrollUntilVisible(
-    targets.first,
-    delta,
-    scrollable: scrollable,
-  );
-  await tester.pump(const Duration(milliseconds: 300));
+  final verticalElements = scrollables.evaluate().where((element) {
+    final scrollable = element.widget as Scrollable;
+    return scrollable.axisDirection == AxisDirection.down ||
+        scrollable.axisDirection == AxisDirection.up;
+  }).toList();
+  if (verticalElements.isEmpty) {
+    throw TestFailure('No visible vertical Scrollable while finding: $text');
+  }
+  final selectedElement =
+      useLastScrollable ? verticalElements.last : verticalElements.first;
+  final scrollableFinder =
+      find.byElementPredicate((element) => element == selectedElement);
+  final deadline = DateTime.now().add(const Duration(seconds: 30));
+
+  while (DateTime.now().isBefore(deadline)) {
+    await tester.pump(const Duration(milliseconds: 250));
+    final targetInScrollable = find.descendant(
+      of: scrollableFinder,
+      matching: find.text(text),
+    );
+    if (targetInScrollable.evaluate().isNotEmpty) {
+      await tester.ensureVisible(targetInScrollable.first);
+      await tester.pump(const Duration(milliseconds: 300));
+      return;
+    }
+
+    final scrollable = tester.widget<Scrollable>(scrollableFinder);
+    await tester.drag(
+      scrollableFinder,
+      _forwardDragOffsetD2G(scrollable.axisDirection, delta),
+    );
+    await tester.pump(const Duration(milliseconds: 300));
+  }
+  throw TestFailure('Timed out scrolling to text: $text');
 }
 
 Future<void> tapNavigationLabelD2G(
