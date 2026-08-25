@@ -24,9 +24,9 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Run v0.9.18 current-head iOS acceptance
+      - name: Run v0.9.19 current-head iOS acceptance
         shell: bash
-        run: bash tools/run_task20_d2j_v0918_current_head_ios_ci.sh
+        run: bash tools/run_task20_d2j_v0919_current_head_ios_ci.sh
 
       - name: Upload Task 20-B iOS evidence
         if: always()
@@ -48,6 +48,7 @@ jobs:
             implementation-v0.9.16.zip
             implementation-v0.9.17.zip
             implementation-v0.9.18.zip
+            implementation-v0.9.19.zip
             app/build/task20_b_logs/ios
             app/build/task20_b_logs/flutter
             app/build/task20_d1_ios_launch_smoke
