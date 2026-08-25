@@ -22,9 +22,9 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Rebuild and verify canonical v0.9.16
+      - name: Rebuild and verify canonical v0.9.17
         shell: bash
-        run: bash tools/task20_d2j_build_current_v0916.sh
+        run: bash tools/task20_d2j_build_current_v0917.sh
 
       - name: Install pinned Flutter SDK from official archive
         id: flutter-sdk
@@ -93,6 +93,7 @@ jobs:
             implementation-v0.9.13.zip
             implementation-v0.9.15.zip
             implementation-v0.9.16.zip
+            implementation-v0.9.17.zip
             app/build/task20_b_logs/ios
             app/build/task20_d1_ios_launch_smoke
             app/build/task20_d2j_dynamic_type
