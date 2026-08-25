@@ -1,127 +1,100 @@
 # Task20-D2J レビュー資料
 
-## 目的
+## 現在判定
 
-Task20-D2のD2-11「文字拡大」を、既存の受入済み主要導線を再利用してGitHub-hosted iOS Simulator上で自動確認する。受入条件は実装に合わせて緩和しない。
+Task20-D2のD2-11「文字拡大」をGitHub-hosted iOS Simulatorで自動確認する。受入条件は実装に合わせて緩和しない。main正本はv0.9.7 / 0.9.7+25のまま、PR #19はDraft／未mergeを維持する。
 
-main正本はv0.9.7のまま。D2I受入済みv0.9.10を保持し、D2Jで実際に検出した失敗候補を上書きせず履歴固定する。現在候補は **v0.9.13 / 0.9.13+31**。
+- D2H：PR #17 exact Head `84dccd8f65f71ddce0c0201294bf648372c4de51`でcurrent scope受入済み。
+- D2I：PR #18 exact Head `e48a66ee8cb3f23ba9ed69607c71f574fe1c508e`、Flutter #214／iOS #201 SUCCESS。定義済みGitHub-hosted iOS Simulator範囲で`AUTOMATED PASS`。
+- D2J：未PASS。PR #19の直前Head `2888575f573312a70de285ce8a6eb18d0274ed23`ではFlutter #253 SUCCESS、standard iOS #240 FAIL、Dynamic Type #39 FAIL。
+- Task20-D2／Task20-B全体：未完了。
 
 ## 正本系譜
 
-- main正本：v0.9.7 / 0.9.7+25
-- D2I受入済み候補：v0.9.10 / 0.9.10+28、PR #18 Head `e48a66ee8cb3f23ba9ed69607c71f574fe1c508e`
-- D2J失敗候補：v0.9.11 / 0.9.11+29
-- D2J失敗候補：v0.9.12 / 0.9.12+30
-- D2J current candidate：v0.9.13 / 0.9.13+31
+- main：v0.9.7 / 0.9.7+25
+- D2I accepted：v0.9.10 / 0.9.10+28
+- D2J failed：v0.9.11 / 0.9.11+29
+- D2J failed：v0.9.12 / 0.9.12+30
+- D2J product-layout fix：v0.9.13 / 0.9.13+31、ZIP `d6b0016b669bde9091294c52d7c138ce964d90515b3dd42320bac784f3eef586`
+- v0.9.14 / 0.9.14+32：ローカルのみで固定したdocs/evidence consistency候補。ZIP `57c3df06f4cde4a96cb630a614374d52a7424cda5a8fef2ab5ec4535d9592ab0`。GitHub未反映のまま履歴固定し、別SHAで再作成しない。
+- current candidate：v0.9.15 / 0.9.15+33。v0.9.13の製品`lib`／test／Schema／Migration／Seed／assetsを保持し、文書整合性と受入harnessのみ修正する。
 
-current build lineageはクリーンなv0.9.7からD2I v0.9.8〜v0.9.10を既存builderで再現し、v0.9.11、v0.9.12、v0.9.13を順にpayload-free builderで再現する。既存候補のZIP SHAは上書きしない。
+## 既存D2J failure履歴
 
-## D2J正式FAIL履歴
+- #3：Home TodayAction 192px下overflow。製品layout failure。
+- #10：Menu empty state 121px下overflow＋CTA off-screen。製品layout failure。
+- #21/#22：週間予定74px右overflow。v0.9.12でresponsive stackingを導入。
+- #32：D2E開始前CTAを画面外まで探索しないharness defect。製品failureにはしない。
+- #33：D2E pain sheet 39px右overflow。製品layout failure。v0.9.13で対象2 Dropdownへ`isExpanded: true`を追加。
 
-### D2J #3 — Home TodayAction
+## standard iOS証跡transport履歴
 
-Head `d837ebf1cfaba0e20f990673720fd9c345e6728e`。iPhone SE相当＋`accessibility-extra-large`でHomeに192px下overflow。製品layout failure。
+- #234：D2I compact phase2 test自体はPASSしたがmetadata stdout transport欠落。
+- #235：D2H compactの複数finder一致によるharness target ambiguity。
+- #237：D2H regular/compact PASS後、D2I `reportData`代入で`screenshots`を上書きしPNG欠落。既存`reportData`を保持してmetadataを追加する方式へ修正。
 
-### D2J #10 — Menu empty state
+## exact Head `2888575f...` の終端結果
 
-Head `2ee85fdab5c1c67c7047072fca96d8ff13c7d3b5`。Home修正後、Menu空状態で121px下overflow＋CTA off-screen。製品layout failure。
+### Flutter #253
 
-### D2J #21 / #22 — 「今週の予定」74px右overflow
+SUCCESS。v0.9.13 deterministic package、56 tests、C3 analyzer、C4 dependency等を通過。
 
-v0.9.11で74px右overflowを検出。診断Head `4d782c73f900834dda11ac8b4b6793af7468b510` / run #22でD2D主要画面checkpointを追加し、`task20_d2d_weekly_planner_prepare_test.dart:27`、すなわち「今週の予定」表示直後を最初の失敗境界として確定。Artifact ID `9355195565` / digest `sha256:86443bc753da7cf97fcfa4aba25b3b44298dacf0c9bedfa5dca568129890d419`。
+### Dynamic Type #39 / run `32335444802`
 
-### D2J #32 — D2E start CTA harness reachability
+FAIL。D2J enlarged-textはD2E調整導線まで到達し、直前の39px RenderFlex overflow再発は検出されなかった。その後`この内容で開始する`で`Timed out waiting to tap`。
 
-Head `576360754d1e112621ee43b5dc4837c3cdb1ca68` / run `32317977300`。v0.9.12の週間予定修正はD2D enlarged-text経路を通過したが、D2Eで「予定どおり開始する」を待つテストが失敗。製品画面はListViewで、テスト側が拡大文字時に画面外のCTAまでスクロールしていなかったため、harness reachability defectと診断。製品failureとは判定せず、テスト側だけスクロール＋診断を追加した。
+対象画面は縦スクロールで、拡大文字時にCTAがListViewの未生成領域へ移動する。従来`tapFinder`はfinderが生成されるまで待つだけで、finder生成に必要なスクロールを行わないため停止した。製品layout/assertion failureではなくharness lazy-widget reachability defectと分類する。
 
-### D2J #33 — D2E adjustment sheet 39px右overflow
+### standard iOS #240 / run `32335444799`
 
-Head `369a3977661a058569ba5f500f493d887b6b5762` / run `32325112684`。CTA reachability修正後、D2E開始前確認を通過し `D2E_01_start_check.png` を生成。その後「今日の状態に合わせる」→痛み・違和感対応の導線で39px右方向RenderFlex overflowを検出した。これはstartup/harness failureではなく製品layout failureのため、v0.9.12を失敗候補として固定する。
+FAIL。regular D2GはPASS。compact D2Gで`端末内データを削除`を`scrollToTextD2G`が生成前にfinderへ要求し0件で停止した。同じく遅延生成Widget探索のharness defect。D2H/D2Iの既存受入条件は変更しない。
 
-Artifact ID `9391867618` / digest `sha256:48f7854831225a755b950f2357d51627999bb982320ff4745ff6b46b05b86f5e`。
+## v0.9.15 harness修正
 
-## 標準iOS #234 — D2I証跡transport failure
+製品`lib/`は変更しない。
 
-Head `369a3977661a058569ba5f500f493d887b6b5762` / run `32325112771`。D2Iのregular phase1/phase2、compact phase1はテストPASS＋metadata chunk取得。compact phase2もアプリ側テスト自体はPASSしたが、`flutter:` metadata行がdriver logへ転送されず、runnerが `metadata marker not found: D2I_PHASE2_METADATA` でFAILした。
+- `task20_d2d_test_support.dart`：tap対象がまだWidget treeへ生成されていない場合、visible vertical Scrollableをforward方向へ段階的にdragし、target生成後に従来どおり`ensureVisible`＋tapする。
+- `task20_d2g_test_support.dart`：対象Textの存在をscroll前提にせず、選択したvisible vertical Scrollableをforward探索し、対象がそのScrollable配下へ生成された時点で`ensureVisible`する。
+- assertion、文言、Dynamic Type category、retry policy、製品保存／遷移ロジックは変更しない。
 
-これはD2I製品挙動の失敗ではなく証跡transportの欠陥。v0.9.13 current Headではtest processのstdoutに依存せず、`IntegrationTestWidgetsFlutterBinding.reportData`をdriver側`responseDataCallback`で受け、既存parser互換のmetadata chunkとしてdriver stdoutへ出力する。検査項目・比較条件は変更しない。
+## v0.9.15 canonical固定値
 
-## v0.9.13修正
-
-対象：`lib/features/workout/presentation/workout_adjustment_page.dart` の痛み・違和感対応sheet。
-
-小型Simulator＋`accessibility-extra-large`では、身体部位／対応内容の`DropdownButtonFormField`で選択ラベルのintrinsic widthが利用可能幅を超え、内部Rowが39px右overflowした。v0.9.13では対象2フィールドへ `isExpanded: true` を付与し、選択表示をfield幅内に制約する。
-
-- 文言、選択肢、保存、遷移、workoutロジックは変更しない
-- v0.9.12の週間予定responsive stackingを保持
-- D2I修正、56 testsを保持
-- Schema v9 / 75 tables、Migration、Seed、assetsは変更しない
-
-## v0.9.13固定値
-
-- parent v0.9.12 ZIP SHA-256：`a1a2c89d73324a72d10a1d9b8a50bc896cf358f71a7c5dc485b8c3bd4faeb2a3`
-- v0.9.13 ZIP SHA-256：`d6b0016b669bde9091294c52d7c138ce964d90515b3dd42320bac784f3eef586`
-- runtime tree (`lib` + `test`)：`9fb2b589aed40c043ec94ce0cfce877f723572f36786c4c87fcb4082a970cd69`
+- parent canonical：v0.9.13 / 0.9.13+31
+- ZIP SHA-256：`ccf69d61ee4f98e7c3a0e8926ab42c53cf868f133303d573b1d30896d6119b60`
 - product `lib` tree：`28299d8a1c9519594fdafc605406da791ee7bd3c5a1b10b0d793c86e88ed1e65`
 - test tree：`878bdfb548bcd42afbc3def4d7c6e680fd25432c0588c05e6a7bbf50bbfeeca5`
-- weekly planner SHA-256：`d721ebdf5294ef02a550dff7936a19c9ea979502e9e927bbfd4b3951f8f964a7`
-- workout adjustment SHA-256：`ec626105f62872cb2aa90137011442bb8300640818d36b5872026948c2f425e5`
+- runtime (`lib` + `test`)：`9fb2b589aed40c043ec94ce0cfce877f723572f36786c4c87fcb4082a970cd69`
 - Schema tree：`bc1dcc6000defb6bde64156e6f019056bf983bcc185cfda108c1635cb754f4af`
 - assets tree：`cb0c88dc1b40ded797d647904f19b25916cfb8e0c1f3980b141823530ac529fe`
 - expected Flutter tests：56
-- canonical file count：306
+- canonical files：306
 
-ローカルではv0.9.13 builderをクリーンなv0.9.12へ適用し、2回のdeterministic buildが同一ZIP SHA `d6b0016b...` になった。verifierでproduct/runtime/test/schema/assets hashを照合済み。正式なruntime/analyzer/iOS/Dynamic Type結果はexact current Head CIのみを根拠とする。
-
-## current Head標準iOS回帰
-
-historical D2H PASSはPR #17のv0.9.7 Headに対する証跡であり、v0.9.13の回帰証跡には流用しない。v0.9.13標準iOSレーンへD2Hを組み込み、current candidateで以下を再検証する。
-
-- finalized weekly menu persistence
-- partial workout record persistence
-- body measurement persistence
-- primary training goal persistence
-- OS-level process termination/restart
-
-D2Hの判定範囲は従来どおりD2-06/07/08/10 partialであり、Task20-D2全体PASSへ拡張しない。
-
-### 標準iOS #235 — D2H compact harness failure
-
-Head `4b6bfa304ad1e6f67baa10ff7cce92b863dca0f2` / run `32330457311`。D2H regular端末はphase1/phase2ともPASS。その後compact phase1で、My Page復帰後の`筋力を高めたい`が複数Widgetに一致し、`scrollUntilVisible`へ複数targetが渡って `Bad state: Too many elements` で停止した。Rendering Library例外や製品assertionではなくtest harnessのtarget一意性欠陥。
-
-Head `9e979678fea47a9b9c0f3f27b4a7ab308f3bb1c3`以降では、選択したScrollable配下の一致targetを優先し、`targets.first`を明示して1要素だけを`scrollUntilVisible`へ渡す。製品コード・D2H検査項目・受入条件は変更しない。
-
-### 標準iOS #237 — D2I screenshot reportData transport failure
-
-Head `cfcc1abff921f577a4d59d8e8cc0fafb70458663` / run `32332342244`。D2Hはregular/compactともphase1/phase2およびOS-level terminate/restartまでPASS。続くD2I regular phase1もアプリ側テストはexit 0で、`responseDataCallback`経由のmetadata chunkも取得できたが、`D2I_01_reset_ready.png` / `D2I_02_intro_after_reset.png`が生成されずrunnerがFAILした。Artifact `9394293873` / `sha256:e4ff5882f430f04c1fbbf0b91adb75ce9cb6c0f1e274380270503f0012f884e8`。
-
-Flutter 3.44.6固定refの`IntegrationTestWidgetsFlutterBinding.takeScreenshot`は`reportData['screenshots']`へ画像情報を蓄積し、`integrationDriver`は最終responseの`screenshots`を`onScreenshot`へ渡す。D2I testが最後に`binding.reportData = {...}`でmetadata mapを代入していたため、既に蓄積した`screenshots`を上書きしていた。修正は既存`reportData`を保持したまま`task` / `phase` / `metadata`キーを追加する方式とし、スクリーンショット証跡とmetadata transportを両立させる。製品コード、D2I検査条件、v0.9.13 ZIPは変更しない。
+ローカルでcanonical docs/evidence候補は26/26 static verifier PASS。v0.9.15 ZIPは3回再生成して同一SHA `ccf69d61...`。v0.9.13→v0.9.15 patch replayも一致。正式判定はGitHub exact current HeadのCI／Artifactのみを使う。
 
 ## D2J固定条件
 
 - D1 `compact` role（iPhone SE相当）1台
 - content-size category：`accessibility-extra-large`
-- erase／boot後ごとにDynamic Type setterを適用し、setter/help/queryをArtifact保存
-- D2A／D2D／D2E／D2G既存導線を同じ拡大文字状態で再利用
-- 必須画面：intro、基本情報、メニュー、実施、マイページ
+- Dynamic Type setter/help/queryをArtifact保存
+- D2A／D2D／D2E／D2G主要導線を同じ拡大文字状態で再利用
 - `RenderFlex overflow`、Rendering Library exception、ErrorWidgetは自動FAIL
 - startup infrastructure failureのみ既定条件で最大1回clean retry。product/assertion/layout failureは再試行しない
 
 ## 正式受入条件
 
-同一current Headで以下をすべて要求する。
+同一exact current Headで以下をすべて要求する。
 
 1. Task20-B2 ZIP Integration terminal SUCCESS
 2. Task20-B2 iOS ZIP Integration terminal SUCCESS
 3. Task20-D2J iOS Dynamic Type Acceptance terminal SUCCESS
-4. 標準iOSでD2H current-candidate regression、D2I、既存D2A/C/D/E/F/GがSUCCESS
+4. standard iOSでD2H current-candidate regression、D2I、既存D2A/C/D/E/F/G SUCCESS
 5. C3 analyzer / C4 dependency gate SUCCESS
-6. v0.9.10／v0.9.11／v0.9.12／v0.9.13 ZIP SHAが固定値に一致
-7. D2I result/metadata、D2H result、D2J result/log/Dynamic Type setter/PNG SHA-sizeをArtifact監査
-8. D2J全PNGを目視し、blank、ErrorWidget、overflow、切れ、重なり、操作不能表示なし
+6. v0.9.10／11／12／13／15 ZIP SHA固定値一致（v0.9.14はGitHub未反映のlocal-only履歴なのでformal lineageへ混入させない）
+7. D2I／D2H／D2J result・log・metadata・Dynamic Type setter・PNG SHA/sizeをArtifact監査
+8. D2J必須PNG全件目視でblank／ErrorWidget／overflow／切れ／重なり／操作不能なし
 
 ここまで満たした場合だけD2-11を定義済み1端末／`accessibility-extra-large`範囲で`AUTOMATED PASS`へ更新する。
 
-## 判定境界
+## PASS後も残る範囲
 
-D2J PASS後も、Dynamic Type全サイズ／最大カテゴリ、D2-08 reset途中OS終了、D2-10未網羅、iPhone実機、native accessibility（VoiceOver等）は別残件。Task20-D2／Task20-B全体は未完了。PR #19はDraft／未merge、main正本v0.9.7も変更しない。
+Dynamic Type全サイズ／最大カテゴリ、D2-08 reset途中OS終了、D2-10未網羅、iPhone実機、native accessibility（VoiceOver等）。Task20-D2／Task20-B全体は未完了。PR #19はDraft／未merge、main正本v0.9.7も変更しない。
