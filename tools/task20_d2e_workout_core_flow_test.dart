@@ -209,9 +209,11 @@ void main() {
       expectHealthyFrame(tester);
       await binding.takeScreenshot('D2E_05_rest');
 
-      if (find.text('休憩を終了する').evaluate().isNotEmpty) {
-        await tapText(tester, '休憩を終了する');
-      }
+      await scrollToText(tester, '休憩を終了する', delta: 200);
+      expect(find.text('休憩を終了する'), findsOneWidget);
+      await tapText(tester, '休憩を終了する');
+      await scrollToText(tester, '次の種目へ', delta: 200);
+      expect(find.text('次の種目へ'), findsOneWidget);
       await tapText(tester, '次の種目へ');
       await waitForText(tester, '2 / 2種目');
       expect(find.text('フォームを確認'), findsOneWidget);
