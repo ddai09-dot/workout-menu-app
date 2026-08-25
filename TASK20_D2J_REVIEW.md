@@ -34,9 +34,7 @@ v0.9.15 ZIP SHA-256：`ccf69d61ee4f98e7c3a0e8926ab42c53cf868f133303d573b1d30896d
 
 ## current Head
 
-`20d2635b6cf7e4d4ff7b595a16f18a3443405ad5`
-
-このHeadだけを次の正式判定対象とする。Flutter #254、standard iOS #241、Dynamic Type #40の3本すべてが終端SUCCESSし、Artifact実物監査まで完了するまではD2J／D2-11をPASSにしない。
+PR #19の最新Headに紐づくCIだけを正式判定対象とする。3 CIすべてが終端SUCCESSし、Artifact実物監査まで完了するまではD2J／D2-11をPASSにしない。
 
 ## 正式受入条件
 
