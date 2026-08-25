@@ -5,10 +5,13 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 APP_DIR="${1:-$ROOT/app}"
 LOG_DIR="${TASK20_D2J_LOG_DIR:-$APP_DIR/build/task20_d2j_dynamic_type}"
 SOURCE_RUNNER="$ROOT/tools/run_task20_d2j_dynamic_type_acceptance.sh"
-PATCHED_RUNNER="$LOG_DIR/patched_dynamic_type_runner.sh"
+# Keep the generated runner under repo-root/tools so its own BASH_SOURCE-based
+# ROOT calculation remains identical to the canonical source runner.
+PATCHED_RUNNER="$ROOT/tools/.task20_d2j_dynamic_type_acceptance_warm_retry.generated.sh"
 PATCH_METADATA="$LOG_DIR/warm_retry_patch_metadata.json"
 
 mkdir -p "$LOG_DIR"
+trap 'rm -f "$PATCHED_RUNNER"' EXIT
 
 python3 - "$SOURCE_RUNNER" "$PATCHED_RUNNER" "$PATCH_METADATA" <<'PY'
 import hashlib
@@ -95,6 +98,8 @@ metadata_path.write_text(
             "source_runner": str(source),
             "source_git_blob_sha1": blob_sha,
             "expected_source_git_blob_sha1": expected_blob_sha,
+            "generated_runner": str(destination),
+            "generated_runner_location_preserves_repo_root": True,
             "fresh_attempt_calls_replaced": call_count,
             "retry_reset_mode": "warm-retry-no-erase",
             "warm_retry_resets": [
