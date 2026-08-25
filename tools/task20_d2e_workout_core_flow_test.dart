@@ -84,10 +84,7 @@ Future<void> waitForWorkoutStartReady(
       } catch (error, stackTrace) {
         await binding.takeScreenshot('D2E_DIAG_start_cta_unreachable');
         final scrollableCount = find.byType(Scrollable).evaluate().length;
-        final progressCount = find
-            .byType(CircularProgressIndicator)
-            .evaluate()
-            .length;
+        final progressCount = find.byType(CircularProgressIndicator).evaluate().length;
         throw TestFailure(
           'Workout start summary loaded, but enlarged-text CTA reachability '
           'failed. error=$error; scrollables=$scrollableCount; '
@@ -105,10 +102,7 @@ Future<void> waitForWorkoutStartReady(
   }
 
   await binding.takeScreenshot('D2E_DIAG_start_load_timeout');
-  final progressCount = find
-      .byType(CircularProgressIndicator)
-      .evaluate()
-      .length;
+  final progressCount = find.byType(CircularProgressIndicator).evaluate().length;
   throw TestFailure(
     'Workout start summary did not become ready or show the expected error '
     'within 60 seconds. progressIndicators=$progressCount; '
@@ -218,7 +212,6 @@ void main() {
       if (find.text('休憩を終了する').evaluate().isNotEmpty) {
         await tapText(tester, '休憩を終了する');
       }
-      await waitForText(tester, '次の種目へ');
       await tapText(tester, '次の種目へ');
       await waitForText(tester, '2 / 2種目');
       expect(find.text('フォームを確認'), findsOneWidget);
