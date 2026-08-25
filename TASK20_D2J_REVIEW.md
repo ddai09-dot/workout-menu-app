@@ -6,7 +6,7 @@ Task20-D2のD2-11「文字拡大」をGitHub-hosted iOS Simulatorで自動確認
 
 - D2H：PR #17 exact Head `84dccd8f65f71ddce0c0201294bf648372c4de51`でcurrent scope受入済み。
 - D2I：PR #18 exact Head `e48a66ee8cb3f23ba9ed69607c71f574fe1c508e`、Flutter #214／iOS #201 SUCCESS。定義済みGitHub-hosted iOS Simulator範囲で`AUTOMATED PASS`。
-- D2J：未PASS。PR #19 Head `90d1bfd37fb3ea356b1b3558342e1ffe6b148205`ではFlutter #256 SUCCESS、Dynamic Type #42 FAIL、standard iOS #243は終端待ち。
+- D2J：未PASS。PR #19 Head `90d1bfd37fb3ea356b1b3558342e1ffe6b148205`ではFlutter #256 SUCCESS、Dynamic Type #42 FAIL。standard iOS #243は旧Headが既にD2J FAIL確定のため正式判定対象外とし、v0.9.16 exact HeadでD2Gを含め全項目を再検証する。
 - Task20-D2／Task20-B全体：未完了。
 
 ## 正本系譜
@@ -24,7 +24,7 @@ Task20-D2のD2-11「文字拡大」をGitHub-hosted iOS Simulatorで自動確認
 
 - Flutter #256：SUCCESS。56/56、C3、C4、Artifact監査PASS。
 - Dynamic Type #42：FAIL。D2A／D2DとD2Eの旧停止点`この内容で開始する`を通過後、セッション画面の画面外`セット完了`をWidget生成前に直接assertして0件停止。製品側に対象操作は存在し、新規RenderFlex overflow／ErrorWidgetは確認されていないため追加のharness lazy-widget reachability defectと分類する。
-- standard iOS #243：終端待ち。結果確定前にPR branchを動かさず、D2G compact修正の証跡を保持する。
+- standard iOS #243：旧Headは#42で正式受入不能が確定済み。途中結果を新Head受入へ流用せず、v0.9.16のstandard iOSでD2G compactを含め再検証する。
 
 ## v0.9.16修正
 
