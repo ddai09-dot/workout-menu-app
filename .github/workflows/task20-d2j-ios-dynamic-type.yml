@@ -63,7 +63,7 @@ jobs:
           set -Eeuo pipefail
           TASK20_D2J_DRIVE_TIMEOUT_SECONDS=1800 \
           TASK20_D2J_LOG_DIR="$GITHUB_WORKSPACE/app/build/task20_d2j_dynamic_type" \
-            bash tools/run_task20_d2j_dynamic_type_acceptance.sh \
+            bash tools/run_task20_d2j_dynamic_type_acceptance_warm_retry.sh \
             "$GITHUB_WORKSPACE/app"
 
       - name: Verify Task 20-C3 clean analyzer gate
