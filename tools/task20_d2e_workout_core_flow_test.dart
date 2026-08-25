@@ -179,6 +179,7 @@ void main() {
       expect(find.text('フォームを確認'), findsOneWidget);
       await scrollToText(tester, 'セット完了', delta: 200);
       expect(find.text('セット完了'), findsOneWidget);
+      await scrollToText(tester, 'フォームを確認', delta: -200);
       expectHealthyFrame(tester);
       await binding.takeScreenshot('D2E_03_session');
 
