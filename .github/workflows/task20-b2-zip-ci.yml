@@ -24,9 +24,9 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Rebuild and verify canonical v0.9.15
+      - name: Rebuild and verify canonical v0.9.16
         shell: bash
-        run: bash tools/task20_d2j_build_current_v0915.sh
+        run: bash tools/task20_d2j_build_current_v0916.sh
 
       - name: Install pinned Flutter SDK from official archive
         id: flutter-sdk
@@ -82,6 +82,7 @@ jobs:
             implementation-v0.9.12.zip
             implementation-v0.9.13.zip
             implementation-v0.9.15.zip
+            implementation-v0.9.16.zip
             app/build/task20_b_logs/flutter
             app/pubspec.yaml
             app/pubspec.lock
