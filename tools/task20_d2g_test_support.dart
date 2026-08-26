@@ -27,9 +27,20 @@ Future<void> scrollToTextD2G(
     throw TestFailure('D2G scroll delta must be positive: $delta');
   }
 
-  final scrollables = find.byType(Scrollable).hitTestable();
-  expect(scrollables, findsWidgets);
+  // Do not require the Scrollable's center point to be hit-testable here.
+  // With accessibility-extra-large, a transient enlarged SnackBar can cover
+  // that center point even though the My Page ListView remains visibly exposed
+  // and user-scrollable in its upper region. Restrict to onstage, attached,
+  // vertical Scrollables, then start the real drag from the exposed upper part
+  // of the selected RenderBox below.
+  final scrollables = find.byType(Scrollable);
   final verticalElements = scrollables.evaluate().where((element) {
+    final renderObject = element.renderObject;
+    if (renderObject is! RenderBox ||
+        !renderObject.attached ||
+        !renderObject.hasSize) {
+      return false;
+    }
     final scrollable = element.widget as Scrollable;
     return scrollable.axisDirection == AxisDirection.down ||
         scrollable.axisDirection == AxisDirection.up;
@@ -57,6 +68,29 @@ Future<void> scrollToTextD2G(
     return true;
   }
 
+  Future<void> dragForward(double distance) async {
+    final scrollable = tester.widget<Scrollable>(scrollableFinder);
+    final renderBox = tester.renderObject<RenderBox>(scrollableFinder);
+    if (renderBox.size.width <= 24 || renderBox.size.height <= 24) {
+      throw TestFailure(
+        'D2G Scrollable has no usable drag surface while finding: $text; '
+        'size=${renderBox.size}',
+      );
+    }
+    final preferredY = renderBox.size.height * 0.20;
+    final localY = math.max(
+      12.0,
+      math.min(preferredY, renderBox.size.height - 12.0),
+    );
+    final dragStart = renderBox.localToGlobal(
+      Offset(renderBox.size.width / 2, localY),
+    );
+    await tester.dragFrom(
+      dragStart,
+      _forwardDragOffsetD2G(scrollable.axisDirection, distance),
+    );
+  }
+
   if (await targetIsAvailable()) {
     return;
   }
@@ -77,7 +111,6 @@ Future<void> scrollToTextD2G(
   }
 
   while (DateTime.now().isBefore(deadline)) {
-    final scrollable = tester.widget<Scrollable>(scrollableFinder);
     final state = tester.state<ScrollableState>(scrollableFinder);
     final position = state.position;
     final remaining = position.extentAfter;
@@ -85,10 +118,7 @@ Future<void> scrollToTextD2G(
       break;
     }
     final distance = math.min(delta, remaining + 1);
-    await tester.drag(
-      scrollableFinder,
-      _forwardDragOffsetD2G(scrollable.axisDirection, distance),
-    );
+    await dragForward(distance);
     await tester.pump(const Duration(milliseconds: 300));
     if (await targetIsAvailable()) {
       return;
