@@ -57,39 +57,52 @@ Future<void> scrollToTextD2G(
     return true;
   }
 
-  Future<bool> scan({required bool forward}) async {
-    while (DateTime.now().isBefore(deadline)) {
-      if (await targetIsAvailable()) {
-        return true;
-      }
-
-      final scrollable = tester.widget<Scrollable>(scrollableFinder);
-      final state = tester.state<ScrollableState>(scrollableFinder);
-      final position = state.position;
-      final remaining = forward ? position.extentAfter : position.extentBefore;
-      if (remaining <= 0.5) {
-        return false;
-      }
-      final distance = math.min(delta, remaining + 1);
-      await tester.drag(
-        scrollableFinder,
-        _forwardDragOffsetD2G(
-          scrollable.axisDirection,
-          forward ? distance : -distance,
-        ),
-      );
-      await tester.pump(const Duration(milliseconds: 300));
-    }
-    return false;
-  }
-
-  // Search in the natural forward direction first. If the target was lazily
-  // disposed above the current viewport, reach the end and then scan back.
-  // This mirrors what a user can do and does not relax the target assertion.
-  if (await scan(forward: true) || await scan(forward: false)) {
+  if (await targetIsAvailable()) {
     return;
   }
-  throw TestFailure('Timed out scrolling to text: $text');
+
+  // When enlarged text causes ListView children above the current viewport to
+  // be lazily disposed, reset the same scroll position to its start and scan
+  // forward again with real drag gestures. This keeps the target assertion and
+  // user-scroll reachability intact while avoiding direction-dependent lazy
+  // child discovery.
+  final initialState = tester.state<ScrollableState>(scrollableFinder);
+  final initialPosition = initialState.position;
+  if (initialPosition.extentBefore > 0.5) {
+    initialPosition.jumpTo(initialPosition.minScrollExtent);
+    await tester.pump(const Duration(milliseconds: 500));
+    if (await targetIsAvailable()) {
+      return;
+    }
+  }
+
+  while (DateTime.now().isBefore(deadline)) {
+    final scrollable = tester.widget<Scrollable>(scrollableFinder);
+    final state = tester.state<ScrollableState>(scrollableFinder);
+    final position = state.position;
+    final remaining = position.extentAfter;
+    if (remaining <= 0.5) {
+      break;
+    }
+    final distance = math.min(delta, remaining + 1);
+    await tester.drag(
+      scrollableFinder,
+      _forwardDragOffsetD2G(scrollable.axisDirection, distance),
+    );
+    await tester.pump(const Duration(milliseconds: 300));
+    if (await targetIsAvailable()) {
+      return;
+    }
+  }
+
+  final finalState = tester.state<ScrollableState>(scrollableFinder);
+  final finalPosition = finalState.position;
+  throw TestFailure(
+    'Timed out scrolling to text: $text; '
+    'pixels=${finalPosition.pixels.toStringAsFixed(1)}, '
+    'min=${finalPosition.minScrollExtent.toStringAsFixed(1)}, '
+    'max=${finalPosition.maxScrollExtent.toStringAsFixed(1)}',
+  );
 }
 
 Future<void> tapNavigationLabelD2G(
