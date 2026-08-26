@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
@@ -21,6 +23,10 @@ Future<void> scrollToTextD2G(
   double delta = 320,
   bool useLastScrollable = false,
 }) async {
+  if (delta <= 0) {
+    throw TestFailure('D2G scroll delta must be positive: $delta');
+  }
+
   final scrollables = find.byType(Scrollable).hitTestable();
   expect(scrollables, findsWidgets);
   final verticalElements = scrollables.evaluate().where((element) {
@@ -37,24 +43,51 @@ Future<void> scrollToTextD2G(
       find.byElementPredicate((element) => element == selectedElement);
   final deadline = DateTime.now().add(const Duration(seconds: 30));
 
-  while (DateTime.now().isBefore(deadline)) {
+  Future<bool> targetIsAvailable() async {
     await tester.pump(const Duration(milliseconds: 250));
     final targetInScrollable = find.descendant(
       of: scrollableFinder,
       matching: find.text(text),
     );
-    if (targetInScrollable.evaluate().isNotEmpty) {
-      await tester.ensureVisible(targetInScrollable.first);
-      await tester.pump(const Duration(milliseconds: 300));
-      return;
+    if (targetInScrollable.evaluate().isEmpty) {
+      return false;
     }
-
-    final scrollable = tester.widget<Scrollable>(scrollableFinder);
-    await tester.drag(
-      scrollableFinder,
-      _forwardDragOffsetD2G(scrollable.axisDirection, delta),
-    );
+    await tester.ensureVisible(targetInScrollable.first);
     await tester.pump(const Duration(milliseconds: 300));
+    return true;
+  }
+
+  Future<bool> scan({required bool forward}) async {
+    while (DateTime.now().isBefore(deadline)) {
+      if (await targetIsAvailable()) {
+        return true;
+      }
+
+      final scrollable = tester.widget<Scrollable>(scrollableFinder);
+      final state = tester.state<ScrollableState>(scrollableFinder);
+      final position = state.position;
+      final remaining = forward ? position.extentAfter : position.extentBefore;
+      if (remaining <= 0.5) {
+        return false;
+      }
+      final distance = math.min(delta, remaining + 1);
+      await tester.drag(
+        scrollableFinder,
+        _forwardDragOffsetD2G(
+          scrollable.axisDirection,
+          forward ? distance : -distance,
+        ),
+      );
+      await tester.pump(const Duration(milliseconds: 300));
+    }
+    return false;
+  }
+
+  // Search in the natural forward direction first. If the target was lazily
+  // disposed above the current viewport, reach the end and then scan back.
+  // This mirrors what a user can do and does not relax the target assertion.
+  if (await scan(forward: true) || await scan(forward: false)) {
+    return;
   }
   throw TestFailure('Timed out scrolling to text: $text');
 }
