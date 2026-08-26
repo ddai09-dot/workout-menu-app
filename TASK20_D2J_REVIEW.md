@@ -6,7 +6,7 @@ Task20-D2のD2-11「文字拡大」をGitHub-hosted iOS Simulatorで自動確認
 
 - D2H：current scope受入済み。
 - D2I：定義済みGitHub-hosted iOS Simulator範囲で`AUTOMATED PASS`。
-- D2J：未PASS。v0.9.18ではharness reachability修正後の必須PNG目視監査で、`accessibility-extra-large`時にオンボーディングの`ニックネーム（必須）`がOutlined TextFormFieldのfloating label内で切れる製品UI不具合を確認した。自動テストの技術的成功だけでは受入とせず、必須画面の視認性条件違反としてNGにした。
+- D2J：未PASS。v0.9.18ではharness reachability修正後の必須PNG目視監査で、`accessibility-extra-large`時にオンボーディングの`ニックネーム（必須）`がOutlined TextFormFieldのfloating label内で切れる製品UI不具合を確認した。自動テストの技術的成功だけでは受入とせず、必須画面の視認性条件違反としてNGにした。v0.9.19で製品UIを限定修正後も、Dynamic Type #52はD2G acceptance helperのhit-test前提不具合でFAILしたため、current Headでhelperのみ再修正して再受入する。
 - Task20-D2／Task20-B全体：未完了。
 
 ## 正本系譜
@@ -26,6 +26,14 @@ Task20-D2のD2-11「文字拡大」をGitHub-hosted iOS Simulatorで自動確認
 ## v0.9.19修正
 
 `ニックネーム（必須）`をTextFormFieldの`labelText`から外し、入力欄の直前に通常Textとして配置する。これにより拡大文字時にfloating labelの狭い領域へ押し込まず、必要に応じて折り返せる。入力ヒント、最大30文字、unit/widget test、Schema、Migration、Seed、assetsはv0.9.18から変更しない。製品`lib`のみ意図したUI変更を含む。
+
+## Dynamic Type #52失敗とcurrent helper修正
+
+旧Head `397148c8f03d7aa6104a38dee98d9c5d8bafd5d4`のDynamic Type #52では、canonical v0.9.19再構築、Task20-B iOS checks、D1、D2A、D2D、D2EまでPASSした。D2G attempt 1はdebug接続startup infrastructure timeoutでwarm-retryされ、attempt 2は`D2G_04_goal_saved.png`取得後の`痛み・身体上の制限`再到達で`Scrollable.hitTestable()`が0件となりFAILした。
+
+失敗Artifact ID `9591985984`（digest `sha256:9c642e2f23b40fa4f7809cf13077d5a7b7bde05be2c81b0a36caecf7ef1cb9ef`）を実物監査すると、`accessibility-extra-large`の保存SnackBarが画面下半分近くまで拡大している一方、My Page ListViewは上部に正常表示されていた。Flutter test finderの`hitTestable()`はFinder中心点でhit-testするため、Scrollable中心点がSnackBarに覆われて0件扱いになったもので、製品UI欠落ではなくacceptance-harness defectと分類する。
+
+current helperではScrollable中央点への`hitTestable()`依存を外し、onstageかつattachedな縦Scrollableを選び、SnackBarに覆われない上部の実座標から実dragする。対象文言、到達assertion、設定保存契約は緩和しない。canonical v0.9.19、製品`lib/`、unit/widget test、Schema、Migration、Seed、assetsはこのhelper修正では変更しない。
 
 ## 正式受入条件
 
