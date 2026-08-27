@@ -6,7 +6,7 @@ Task20-D2のD2-11「文字拡大」をGitHub-hosted iOS Simulatorで自動確認
 
 - D2H：current scope受入済み。
 - D2I：定義済みGitHub-hosted iOS Simulator範囲で`AUTOMATED PASS`。
-- D2J：未PASS。v0.9.21 exact HeadではFlutter #282がSUCCESSしたが、Dynamic Type #68 attempt 1でD2Gの痛み・制限設定後に右162pxのRenderFlex overflowを再検出。attempt 2はD2E完了後の画面遷移中に遷移元文言が一時残るタイミングでharnessが先行判定し、D2G前に停止した。v0.9.22で製品UIとharness同期を限定修正し、新exact Headで再受入する。
+- D2J：未PASS。v0.9.22で前回の右162px overflow修正後、Dynamic Type #80はD2A／D2D／D2EをPASSし、D2G終盤の端末内データ初期化画面で`削除されないもの`を通常waitだけで待ったためlazy/scroll範囲外となりtimeoutした。製品overflow再発ではなくharnessの拡大文字スクロール不足と分類し、対象文言を既存`scrollToTextD2G`で実際に到達してから後続判定するよう修正した。最新exact Headで再受入する。
 - Task20-D2／Task20-B全体：未完了。
 
 ## 正本系譜
@@ -40,11 +40,18 @@ Dynamic Type #68 attempt 2はD2A／D2DをPASS。D2E attempt 1はdebug接続timeo
 
 v0.9.22では受入条件を変更せず、ホーム文言の出現後に遷移元`終了後の記録`が消えるまで最大10秒待機してから、既存の`findsNothing` assertionを実行する。
 
+## v0.9.22再受入で判明したharness不足
+
+Dynamic Type #80はcanonical rebuild、Task20-B iOS checks、D1、D2A、D2D phase1/phase2、D2EをPASSした。D2Gでも前回の右162px overflowは再発せず終盤の端末内データ初期化画面まで到達したが、`削除されないもの`を`waitForText`だけで待ったため、`accessibility-extra-large`で下方に押し出されたlazy childを生成・到達できずtimeoutした。
+
+D2Gでは直後に`端末内データを削除`へ`scrollToTextD2G`を使っており、この画面自体はスクロール可能な設計である。受入文言やassertionを削除せず、`削除されないもの`も同じ既存スクロールヘルパーで実際に到達してから後続の削除ボタン無効判定へ進むようharnessのみ修正する。
+
 ## v0.9.22修正
 
 - 痛み・身体上の制限の選択後Dropdownを`isExpanded: true`／`itemHeight: null`へ変更する。
 - D2Gは肩選択直後にも`メニューでの扱い`／`負荷を下げる`を確認し、`expectHealthyFrame`を実行する。
 - D2Eはホーム遷移後、遷移元文言の消失待ちを追加してから既存不在assertを維持する。
+- D2G端末内データ初期化画面は`削除されないもの`を`scrollToTextD2G`で到達確認し、既存の削除ボタン無効判定を維持する。
 - 56件の既存unit/widget test、Schema v9／75テーブル、Migration、Seed、assetsはv0.9.21から変更しない。
 - v0.9.22 ZIPは親v0.9.21から決定的再構築し、SHA-256 `714b56ed1f074f22a500932719d75398ecfbc1c853da74e01eda85c4601fa6eb`へ固定する。
 - 保存済みpatch payloadのSHAは`a182569ec8020758f7d442758b1275ea0ad8d39535ee2d4117b5bb1fb48605b4`。v0.9.21 builderがweekly trace証跡JSONを`0.9.21+39`へ再生成してからv0.9.22 patchを適用するため、その1行だけ実行時に正規化したeffective patch SHAを`248b0c8fa774efb35f648b07a3439bb9b1a458f7fcd9a31a4b11150934338c35`へ固定する。正規化後の出力tree／ZIPはローカル再現で上記v0.9.22固定値と一致済み。
@@ -59,6 +66,6 @@ PR #19最新exact Headで以下をすべて要求する。
 3. C3 analyzer / C4 dependency gate SUCCESS
 4. v0.9.10/11/12/13/15/16/17/18/19/20/21/22 ZIP SHA固定値一致
 5. D2I/D2H/D2J result・log・metadata・Dynamic Type setter・PNG SHA/size監査
-6. D2J必須PNG全件目視でblank／ErrorWidget／overflow／切れ／重なり／操作不能なし。特に`D2J_02_basic_info_large.png`、D2Gの痛み・制限設定画面、確認Dialog、保存後My Pageを確認する
+6. D2J必須PNG全件目視でblank／ErrorWidget／overflow／切れ／重なり／操作不能なし。特に`D2J_02_basic_info_large.png`、D2Gの痛み・制限設定画面、確認Dialog、保存後My Page、端末内データ初期化画面を確認する
 
 満たした場合のみD2-11を定義済み1端末／`accessibility-extra-large`範囲で`AUTOMATED PASS`へ更新する。D2J PASS後もDynamic Type全サイズ／最大カテゴリ、D2-08残件、D2-10未網羅、iPhone実機、native accessibilityは別残件。PR #19はDraft／未merge、main正本v0.9.7も変更しない。
