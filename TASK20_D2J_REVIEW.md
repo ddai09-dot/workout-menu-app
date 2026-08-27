@@ -47,6 +47,7 @@ v0.9.22では受入条件を変更せず、ホーム文言の出現後に遷移�
 - D2Eはホーム遷移後、遷移元文言の消失待ちを追加してから既存不在assertを維持する。
 - 56件の既存unit/widget test、Schema v9／75テーブル、Migration、Seed、assetsはv0.9.21から変更しない。
 - v0.9.22 ZIPは親v0.9.21から決定的再構築し、SHA-256 `714b56ed1f074f22a500932719d75398ecfbc1c853da74e01eda85c4601fa6eb`へ固定する。
+- 保存済みpatch payloadのSHAは`a182569ec8020758f7d442758b1275ea0ad8d39535ee2d4117b5bb1fb48605b4`。v0.9.21 builderがweekly trace証跡JSONを`0.9.21+39`へ再生成してからv0.9.22 patchを適用するため、その1行だけ実行時に正規化したeffective patch SHAを`248b0c8fa774efb35f648b07a3439bb9b1a458f7fcd9a31a4b11150934338c35`へ固定する。正規化後の出力tree／ZIPはローカル再現で上記v0.9.22固定値と一致済み。
 - この文書更新を含む最新exact Headの3 CIとArtifact／PNG監査が完了するまではD2J／D2-11をPASSにしない。
 
 ## 正式受入条件
