@@ -24,9 +24,9 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Run v0.9.22 current-head iOS acceptance
+      - name: Run v0.9.22 current-head iOS acceptance with D2K
         shell: bash
-        run: bash tools/run_task20_d2j_v0922_current_head_ios_ci.sh
+        run: bash tools/run_task20_d2k_v0922_current_head_ios_ci.sh
 
       - name: Upload Task 20-B iOS evidence
         if: always()
@@ -63,6 +63,7 @@ jobs:
             app/build/task20_d2e_workout_core_flow
             app/build/task20_d2f_records_progression
             app/build/task20_d2g_my_page_settings
+            app/build/task20_d2k_reset_interruption
             app/pubspec.yaml
             app/pubspec.lock
             app/lib/**/*.g.dart
