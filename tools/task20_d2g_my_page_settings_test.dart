@@ -230,7 +230,7 @@ void main() {
       await tapText(tester, '端末内データ');
       await waitForText(tester, '端末内データを初期化');
       await waitForText(tester, '削除されるもの');
-      await waitForText(tester, '削除されないもの');
+      await scrollToTextD2G(tester, '削除されないもの');
       await scrollToTextD2G(tester, '端末内データを削除');
       final deleteButton = find.ancestor(
         of: find.text('端末内データを削除'),
