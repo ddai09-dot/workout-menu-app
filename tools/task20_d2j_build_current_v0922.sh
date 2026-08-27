@@ -12,7 +12,8 @@ import base64, gzip, hashlib, json, shutil, stat, subprocess, sys, tempfile, zip
 from pathlib import Path
 
 EXPECTED_ZIP = "714b56ed1f074f22a500932719d75398ecfbc1c853da74e01eda85c4601fa6eb"
-PATCH_SHA = "a182569ec8020758f7d442758b1275ea0ad8d39535ee2d4117b5bb1fb48605b4"
+SOURCE_PATCH_SHA = "a182569ec8020758f7d442758b1275ea0ad8d39535ee2d4117b5bb1fb48605b4"
+PATCH_SHA = "248b0c8fa774efb35f648b07a3439bb9b1a458f7fcd9a31a4b11150934338c35"
 PARENT_LIB = "66bacd2e5bd052e4726e17592e99f5c3a46df61d8fb35bfee7a6c145db7fe4d1"
 EXPECTED = {
     "runtime": "a721adad6bdb97a2b39bafb0a49e83ce6c5474e05467b13f5b79a8177571b6ae",
@@ -54,10 +55,20 @@ source = Path(sys.argv[1]).resolve()
 output = Path(sys.argv[2]).resolve()
 if "version: 0.9.21+39" not in (source / "pubspec.yaml").read_text(encoding="utf-8"):
     raise SystemExit("requires canonical v0.9.21 / 0.9.21+39")
-patch = gzip.decompress(base64.b64decode(PATCH_B64_PATH.read_text(encoding="ascii")))
+source_patch = gzip.decompress(base64.b64decode(PATCH_B64_PATH.read_text(encoding="ascii")))
+actual_source_patch_sha = hashlib.sha256(source_patch).hexdigest()
+if actual_source_patch_sha != SOURCE_PATCH_SHA:
+    raise SystemExit(
+        f"v0.9.22 source patch SHA mismatch: {actual_source_patch_sha} != {SOURCE_PATCH_SHA}"
+    )
+old_context = b'-      "detail": "project version must be 0.9.19+37"'
+new_context = b'-      "detail": "project version must be 0.9.21+39"'
+if source_patch.count(old_context) != 1:
+    raise SystemExit("v0.9.22 source patch weekly trace context marker mismatch")
+patch = source_patch.replace(old_context, new_context, 1)
 actual_patch_sha = hashlib.sha256(patch).hexdigest()
 if actual_patch_sha != PATCH_SHA:
-    raise SystemExit(f"v0.9.22 patch SHA mismatch: {actual_patch_sha} != {PATCH_SHA}")
+    raise SystemExit(f"v0.9.22 effective patch SHA mismatch: {actual_patch_sha} != {PATCH_SHA}")
 
 with tempfile.TemporaryDirectory(prefix="task20-d2j-v0922-") as temp_dir:
     root = Path(temp_dir) / "app"
@@ -117,6 +128,7 @@ print(json.dumps({
     "app_version": "0.9.22+40",
     "parent_canonical_version": "0.9.21+39",
     "zip_sha256": actual_zip,
+    "source_patch_sha256": SOURCE_PATCH_SHA,
     "patch_sha256": PATCH_SHA,
     "expected_flutter_test_count": 56,
     "schema_version": 9,
