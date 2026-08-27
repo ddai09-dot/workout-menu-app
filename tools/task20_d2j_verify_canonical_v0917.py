@@ -1,0 +1,22 @@
+#!/usr/bin/env python3
+from __future__ import annotations
+import hashlib,json,sys
+from pathlib import Path
+R='9fb2b589aed40c043ec94ce0cfce877f723572f36786c4c87fcb4082a970cd69'; L='28299d8a1c9519594fdafc605406da791ee7bd3c5a1b10b0d793c86e88ed1e65'; T='878bdfb548bcd42afbc3def4d7c6e680fd25432c0588c05e6a7bbf50bbfeeca5'; S='bc1dcc6000defb6bde64156e6f019056bf983bcc185cfda108c1635cb754f4af'; A='cb0c88dc1b40ded797d647904f19b25916cfb8e0c1f3980b141823530ac529fe'; EX={'build','.dart_tool'}
+def th(root,parts):
+ d=hashlib.sha256(); fs=[]
+ for part in parts:
+  p=root/part; fs.extend(x for x in p.rglob('*') if x.is_file()) if p.is_dir() else fs.append(p)
+ for p in sorted(set(fs),key=lambda x:x.relative_to(root).as_posix()):
+  rel=p.relative_to(root).as_posix(); d.update(rel.encode()); d.update(b'\0'); d.update(p.read_bytes()); d.update(b'\0')
+ return d.hexdigest()
+def main():
+ root=Path(sys.argv[1]).resolve(); pub=(root/'pubspec.yaml').read_text(); readme=(root/'README.md').read_text(); matrix=(root/'docs/VERSION_MATRIX.md').read_text(); decision=(root/'docs/DECISION_LOG.md').read_text()
+ for needle,text in [('version: 0.9.17+35',pub),('実装基盤 v0.9.17',readme),('現在のプロジェクト版：`0.9.17+35`',matrix),('| 0.9.17 |',matrix),('D-025',decision)]:
+  if needle not in text: raise SystemExit(f'Missing {needle}')
+ manifest=[x for x in (root/'FILE_MANIFEST.txt').read_text().splitlines() if x]; actual=sorted(p.relative_to(root).as_posix() for p in root.rglob('*') if p.is_file() and p.relative_to(root).parts[0] not in EX and '__pycache__' not in p.relative_to(root).parts)
+ if manifest!=actual: raise SystemExit('FILE_MANIFEST mismatch')
+ hashes={'runtime':th(root,['lib','test']),'product_lib':th(root,['lib']),'tests':th(root,['test']),'schema':th(root,['docs/schema_v9.sqlite.sql','docs/migrations','lib/core/database/schema']),'assets':th(root,['assets'])}; expected={'runtime':R,'product_lib':L,'tests':T,'schema':S,'assets':A}
+ if hashes!=expected: raise SystemExit(f'tree mismatch: {hashes}')
+ print(json.dumps({'status':'PASS','canonical_package':'implementation-v0.9.17.zip','app_version':'0.9.17+35','parent_canonical_version':'0.9.16+34','expected_flutter_test_count':56,'schema_version':9,'schema_table_count':75,'tree_hashes':hashes,'d2j_acceptance_status':'PENDING_EXACT_CURRENT_HEAD_CI_AND_ARTIFACT_AUDIT','task20_d2_fully_verified':False},sort_keys=True)); return 0
+if __name__=='__main__': raise SystemExit(main())
