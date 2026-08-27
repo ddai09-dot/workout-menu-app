@@ -21,14 +21,65 @@ void main() {
     (WidgetTester tester) async {
       await app.main();
       await tester.pump();
-      await d2iWaitForText(tester, 'ホーム');
+      await d2iWaitForIntroStable(tester);
 
+      final initialRuntime = d2iRuntimeContext(tester);
+      await initialRuntime.secureStore.delete(d2kMetadataKey);
+      await initialRuntime.secureStore.delete(d2kInterruptedReplacementKey);
+
+      await completePartialWorkoutForRecords(tester);
       final runtime = d2iRuntimeContext(tester);
-      final encoded = await runtime.secureStore.read(d2kMetadataKey);
-      expect(encoded, isNotNull);
-      final metadata = jsonDecode(encoded!) as Map<String, dynamic>;
-      final oldUserId = metadata['oldUserId']! as String;
+      final account = await runtime.accountRepository.ensureAnonymousAccount();
+      final oldUserId = account.userId;
       expect(await runtime.secureStore.read('current_user_id'), oldUserId);
+
+      final schema = await d2iCaptureSchema(runtime.database);
+      final preCounts = await d2iUserOwnedCounts(
+        runtime.database,
+        schema.userOwnedTables,
+        oldUserId,
+      );
+      final preRowIds = await d2iUserOwnedRowIds(
+        runtime.database,
+        schema.userOwnedTables,
+        oldUserId,
+      );
+      final nonZeroTables = preCounts.entries
+          .where((entry) => entry.value > 0)
+          .map((entry) => entry.key)
+          .toList()
+        ..sort();
+      expect(nonZeroTables.length, greaterThanOrEqualTo(10));
+
+      final accountIds = await d2iUserAccountIds(runtime.database);
+      expect(accountIds, <String>[oldUserId]);
+      final preservedCounts = await d2iPreservedCounts(
+        runtime.database,
+        schema.preservedTables,
+      );
+      final preservedFingerprints = await d2iPreservedFingerprints(
+        runtime.database,
+        schema.preservedTables,
+      );
+      expect(await d2iForeignKeyViolationCount(runtime.database), 0);
+
+      final metadata = <String, Object?>{
+        'oldUserId': oldUserId,
+        'appTables': schema.appTables,
+        'userOwnedTables': schema.userOwnedTables,
+        'preservedTables': schema.preservedTables,
+        'schemaSha256': schema.schemaSha256,
+        'preCounts': preCounts,
+        'preRowIds': preRowIds,
+        'preAccountIds': accountIds,
+        'preservedCounts': preservedCounts,
+        'preservedFingerprints': preservedFingerprints,
+        'nonZeroTables': nonZeroTables,
+      };
+      await runtime.secureStore.write(
+        key: d2kMetadataKey,
+        value: jsonEncode(metadata),
+      );
 
       await tapNavigationLabelD2F(tester, 'マイページ');
       await d2iWaitForText(tester, 'トレーニング設定');
@@ -44,6 +95,22 @@ void main() {
         tester,
         '削除したデータは元に戻せないことを確認しました',
       );
+      d2iExpectHealthyFrame(tester);
+      await binding.takeScreenshot('D2K_01_ready_before_interruption');
+      print(
+        'D2K_READY_FOR_DB_LOCK oldUserId=$oldUserId '
+        'nonZeroTables=${nonZeroTables.length}',
+      );
+
+      // The host acquires BEGIN IMMEDIATE on the app database after the marker
+      // above. Keeping this same app process alive avoids launching under the
+      // external lock and makes the interruption point deterministic.
+      final hostLockDeadline =
+          DateTime.now().add(const Duration(seconds: 20));
+      while (DateTime.now().isBefore(hostLockDeadline)) {
+        await tester.pump(const Duration(milliseconds: 250));
+      }
+
       await d2iTapText(tester, '端末内データを削除');
       await d2iWaitForText(tester, 'すべて削除しますか？');
       await d2iTapText(tester, '削除する');
@@ -52,8 +119,7 @@ void main() {
       final deadline = DateTime.now().add(const Duration(seconds: 45));
       while (DateTime.now().isBefore(deadline)) {
         await tester.pump(const Duration(milliseconds: 100));
-        final currentUserId =
-            await runtime.secureStore.read('current_user_id');
+        final currentUserId = await runtime.secureStore.read('current_user_id');
         if (currentUserId != null && currentUserId != oldUserId) {
           interruptedReplacementUserId = currentUserId;
           break;
@@ -82,14 +148,13 @@ void main() {
         'replacementUserId=$interruptedReplacementUserId',
       );
 
-      // The host-side acceptance runner terminates the app after the marker
-      // above while an external SQLite write lock keeps resetLocalData inside
-      // its transaction attempt. The loop intentionally never completes on
-      // its own; OS termination is the expected end of this phase.
+      // The host-side runner terminates the app at this marker while the
+      // external SQLite write lock prevents the reset transaction from
+      // committing. OS termination is the expected end of this phase.
       while (true) {
         await tester.pump(const Duration(seconds: 1));
       }
     },
-    timeout: const Timeout(Duration(minutes: 12)),
+    timeout: const Timeout(Duration(minutes: 20)),
   );
 }
