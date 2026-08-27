@@ -6,7 +6,7 @@ Task20-D2のD2-11「文字拡大」をGitHub-hosted iOS Simulatorで自動確認
 
 - D2H：current scope受入済み。
 - D2I：定義済みGitHub-hosted iOS Simulator範囲で`AUTOMATED PASS`。
-- D2J：未PASS。v0.9.19でオンボーディングの`ニックネーム（必須）`切れを修正し、D2Gのlazy-list／SnackBar hit-test系harness defectも是正したが、exact Head `216e34dbbefce3da6fdc2530b6ae22a26c670f9f`のDynamic Type #54でD2G設定編集画面に製品UIの横overflowを新たに検出した。v0.9.20で限定修正し、最新exact Headで再受入する。
+- D2J：未PASS。v0.9.21 exact HeadではFlutter #282がSUCCESSしたが、Dynamic Type #68 attempt 1でD2Gの痛み・制限設定後に右162pxのRenderFlex overflowを再検出。attempt 2はD2E完了後の画面遷移中に遷移元文言が一時残るタイミングでharnessが先行判定し、D2G前に停止した。v0.9.22で製品UIとharness同期を限定修正し、新exact Headで再受入する。
 - Task20-D2／Task20-B全体：未完了。
 
 ## 正本系譜
@@ -22,24 +22,32 @@ Task20-D2のD2-11「文字拡大」をGitHub-hosted iOS Simulatorで自動確認
 - v0.9.17 / +35：ZIP `969ccdf461d90a0936bce11050930b339d7bb50d6b879830b56d15f633560b2c`
 - v0.9.18 / +36：ZIP `9d1c765ec0dcefb15170516e45ee93492bb775e00e75bf2f4f94db67edb90f82`
 - v0.9.19 / +37：ZIP `94590c894063c6fac75a8db766ea2d0aa6bfe30842428e578f96e7094d614b0e`
-- current candidate：v0.9.20 / v0.9.20+38、ZIP `d94fd5cc83cabef0b9b0949961175f2f6421bf7d54981e746dcd02635c68469f`
+- v0.9.20 / +38：ZIP `d94fd5cc83cabef0b9b0949961175f2f6421bf7d54981e746dcd02635c68469f`
+- v0.9.21 / +39：ZIP `678d2e00c4d52b324be18c4b266e6eda49a51478b4e732456ebc0c32bf4a6447`
+- current candidate：v0.9.22 / v0.9.22+40、ZIP `714b56ed1f074f22a500932719d75398ecfbc1c853da74e01eda85c4601fa6eb`
 
-## Dynamic Type #54失敗
+## v0.9.21再受入で判明した2点
 
-exact Head `216e34dbbefce3da6fdc2530b6ae22a26c670f9f`のDynamic Type #54はcanonical v0.9.19再構築、Task20-B iOS checks、D1、D2A、D2DをPASSした。D2E attempt 1はFlutter debug接続startup infrastructure timeoutだったがwarm retry後のattempt 2でPASSした。
+### D2G製品UI overflow
 
-D2Gでは`D2G_05_restriction_review_prompt.png`取得後、設定保存を完了してMy Pageへ戻った段階のhealthy-frame確認で`A RenderFlex overflowed by 162 pixels on the right.`を検出した。失敗Artifact ID `9593477234`、digest `sha256:cd02e0a63e8bda2258a8294413569d95a63dc40bc3feec82c2494fa198a90fbf`。
+Dynamic Type #68 attempt 1はD2A／D2D／D2Eを通過し、D2Gで肩の痛み・制限を追加して保存後、healthy-frame確認で`A RenderFlex overflowed by 162 pixels on the right.`を再検出した。failure Artifact ID `9596186360`、digest `sha256:6bc2f54dca253b4fec618e11467f0d2fc2a55eb66e937e8b81fdb6b23838ff75`。
 
-証跡と製品構造を照合すると、設定編集AppBarが長い区分名`痛み・身体上の制限`をtitleに置き、保存中はさらに`保存中…`をactionsへ追加する構造だった。`accessibility-extra-large`で横幅制約を超えるため、harnessではなく製品UI不具合と分類する。
+肩を選択すると追加表示される`DropdownButtonFormField`が拡大文字時の横幅制約に未対応だったため、v0.9.22では`isExpanded: true`と`itemHeight: null`を設定する。D2G harnessにも肩選択直後の`expectHealthyFrame`を追加し、保存後まで例外を持ち越さず発生箇所を前倒し検出する。
 
-## v0.9.20修正
+### D2E画面遷移同期
 
-- 設定編集AppBarのtitleを短い`設定`へ固定する。
-- 完全な区分名は本文先頭へ移し、通常Textとして折返し可能にする。
-- 保存中表示は固定24pxの`CircularProgressIndicator`＋`Semantics(label: '保存中')`へ変更し、AppBar横幅を圧迫しない。
-- 今週メニュー確認Dialogを`scrollable: true`にし、拡大文字時も本文へ到達可能にする。
-- 56件の既存unit/widget test、Schema v9／75テーブル、Migration、Seed、assetsはv0.9.19から変更しない。
-- v0.9.20 ZIPは親v0.9.19から決定的再構築し、SHA-256 `d94fd5cc83cabef0b9b0949961175f2f6421bf7d54981e746dcd02635c68469f`へ固定する。
+Dynamic Type #68 attempt 2はD2A／D2DをPASS。D2E attempt 1はdebug接続timeout、warm retry後のattempt 2ではホームの`今日やること`出現まで到達したが、遷移アニメーション中に旧画面`終了後の記録`が一時的に残る状態で既存不在assertを即時実行して停止した。
+
+v0.9.22では受入条件を変更せず、ホーム文言の出現後に遷移元`終了後の記録`が消えるまで最大10秒待機してから、既存の`findsNothing` assertionを実行する。
+
+## v0.9.22修正
+
+- 痛み・身体上の制限の選択後Dropdownを`isExpanded: true`／`itemHeight: null`へ変更する。
+- D2Gは肩選択直後にも`メニューでの扱い`／`負荷を下げる`を確認し、`expectHealthyFrame`を実行する。
+- D2Eはホーム遷移後、遷移元文言の消失待ちを追加してから既存不在assertを維持する。
+- 56件の既存unit/widget test、Schema v9／75テーブル、Migration、Seed、assetsはv0.9.21から変更しない。
+- v0.9.22 ZIPは親v0.9.21から決定的再構築し、SHA-256 `714b56ed1f074f22a500932719d75398ecfbc1c853da74e01eda85c4601fa6eb`へ固定する。
+- この文書更新を含む最新exact Headの3 CIとArtifact／PNG監査が完了するまではD2J／D2-11をPASSにしない。
 
 ## 正式受入条件
 
@@ -48,8 +56,8 @@ PR #19最新exact Headで以下をすべて要求する。
 1. Flutter／standard iOS／D2Jの3 CI terminal SUCCESS
 2. standard iOSでD2H current-candidate regression、D2I、D2A/C/D/E/F/G SUCCESS
 3. C3 analyzer / C4 dependency gate SUCCESS
-4. v0.9.10/11/12/13/15/16/17/18/19/20 ZIP SHA固定値一致
+4. v0.9.10/11/12/13/15/16/17/18/19/20/21/22 ZIP SHA固定値一致
 5. D2I/D2H/D2J result・log・metadata・Dynamic Type setter・PNG SHA/size監査
-6. D2J必須PNG全件目視でblank／ErrorWidget／overflow／切れ／重なり／操作不能なし。特に`D2J_02_basic_info_large.png`の`ニックネーム（必須）`、D2G設定編集画面・確認Dialog・保存後My Pageを確認する
+6. D2J必須PNG全件目視でblank／ErrorWidget／overflow／切れ／重なり／操作不能なし。特に`D2J_02_basic_info_large.png`、D2Gの痛み・制限設定画面、確認Dialog、保存後My Pageを確認する
 
 満たした場合のみD2-11を定義済み1端末／`accessibility-extra-large`範囲で`AUTOMATED PASS`へ更新する。D2J PASS後もDynamic Type全サイズ／最大カテゴリ、D2-08残件、D2-10未網羅、iPhone実機、native accessibilityは別残件。PR #19はDraft／未merge、main正本v0.9.7も変更しない。
