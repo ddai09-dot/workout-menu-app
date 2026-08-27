@@ -26,8 +26,6 @@ def main() -> int:
     )
 
     source_files = {
-        repo_root / "tools" / "task20_d2k_reset_interruption_prepare_test.dart":
-            app_dir / "integration_test" / "task20_d2k_reset_interruption_prepare_test.dart",
         repo_root / "tools" / "task20_d2k_reset_interruption_trigger_test.dart":
             app_dir / "integration_test" / "task20_d2k_reset_interruption_trigger_test.dart",
         repo_root / "tools" / "task20_d2k_reset_interruption_verify_test.dart":
