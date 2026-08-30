@@ -2,6 +2,7 @@
 set -Eeuo pipefail
 
 ROOT="${GITHUB_WORKSPACE:-$(pwd)}"
+PROBE_REVISION="1"
 cd "$ROOT"
 
 # Materialize the exact accepted v0.9.22 product candidate without running the
@@ -33,6 +34,7 @@ probe_log_dir="$ROOT/app/build/task20_d2k_fast_probe"
 d2k_log_dir="$ROOT/app/build/task20_d2k_reset_interruption"
 mkdir -p "$probe_log_dir" "$d2k_log_dir"
 rm -rf "$probe_log_dir"/*
+printf '%s\n' "$PROBE_REVISION" > "$probe_log_dir/probe_revision.txt"
 
 snapshot_attempt() {
   local attempt="$1"
@@ -55,6 +57,7 @@ max_attempts=2
 for attempt in $(seq 1 "$max_attempts"); do
   {
     echo "utc=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+    echo "probe_revision=$PROBE_REVISION"
     echo "attempt=$attempt"
     echo "flutter=$(command -v flutter)"
     echo "dart=$(command -v dart)"
@@ -79,6 +82,7 @@ for attempt in $(seq 1 "$max_attempts"); do
 {
   "task": "Task 20-D2K isolated fast probe",
   "status": "PASS",
+  "probe_revision": "$PROBE_REVISION",
   "attempts": $attempt,
   "acceptance_authority": false,
   "note": "Diagnostic pass only; exact-head full PR iOS regression must also pass."
@@ -96,6 +100,7 @@ JSON
 {
   "task": "Task 20-D2K isolated fast probe",
   "status": "FAIL",
+  "probe_revision": "$PROBE_REVISION",
   "attempts": $attempt,
   "final_exit_code": $exit_code,
   "acceptance_authority": false
