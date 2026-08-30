@@ -8,19 +8,86 @@ LOG_DIR="${TASK20_D2K_LOG_DIR:-$APP_DIR/build/task20_d2k_reset_interruption}"
 TRIGGER_TIMEOUT_SECONDS="${TASK20_D2K_TRIGGER_TIMEOUT_SECONDS:-1200}"
 VERIFY_TIMEOUT_SECONDS="${TASK20_D2K_VERIFY_TIMEOUT_SECONDS:-600}"
 APP_BUNDLE="$APP_DIR/build/ios/iphonesimulator/Runner.app"
-mkdir -p "$LOG_DIR"
-rm -rf "$LOG_DIR"/*
 
+# Preserve the parent-shell PATH handoff evidence written by the v0.9.22
+# wrapper. The old runner deleted this file at startup, which made early CI
+# failures unnecessarily opaque.
+parent_preflight_backup=""
+if [[ -f "$LOG_DIR/parent_preflight.log" ]]; then
+  parent_preflight_backup="$(mktemp)"
+  cp "$LOG_DIR/parent_preflight.log" "$parent_preflight_backup"
+fi
+rm -rf "$LOG_DIR"
+mkdir -p "$LOG_DIR"
+if [[ -n "$parent_preflight_backup" && -f "$parent_preflight_backup" ]]; then
+  cp "$parent_preflight_backup" "$LOG_DIR/parent_preflight.log"
+  rm -f "$parent_preflight_backup"
+fi
+
+current_stage="bootstrap"
+udid=""
+BUNDLE_ID=""
+trigger_pid=""
+lock_pid=""
+lock_release=""
+
+set_stage() {
+  current_stage="$1"
+  printf '%s\n' "$current_stage" > "$LOG_DIR/stage.txt"
+}
+
+record_failure() {
+  local code="$1" line="$2" command="$3"
+  {
+    echo "status=FAIL"
+    echo "stage=$current_stage"
+    echo "exit_code=$code"
+    echo "line=$line"
+    echo "command=$command"
+    echo "utc=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+    echo "pwd=$(pwd)"
+    echo "PATH=$PATH"
+  } > "$LOG_DIR/failure.txt"
+}
+trap 'code=$?; failed_line=$LINENO; failed_command=$BASH_COMMAND; record_failure "$code" "$failed_line" "$failed_command"' ERR
+
+cleanup() {
+  if [[ -n "${lock_release:-}" ]]; then
+    touch "$lock_release" >/dev/null 2>&1 || true
+  fi
+  if [[ -n "${lock_pid:-}" ]] && kill -0 "$lock_pid" >/dev/null 2>&1; then
+    kill "$lock_pid" >/dev/null 2>&1 || true
+  fi
+  if [[ -n "${trigger_pid:-}" ]] && kill -0 "$trigger_pid" >/dev/null 2>&1; then
+    kill "$trigger_pid" >/dev/null 2>&1 || true
+  fi
+  if [[ -n "${udid:-}" && -n "${BUNDLE_ID:-}" ]]; then
+    xcrun simctl terminate "$udid" "$BUNDLE_ID" >/dev/null 2>&1 || true
+    xcrun simctl shutdown "$udid" >/dev/null 2>&1 || true
+  fi
+}
+trap cleanup EXIT
+
+set_stage "preflight"
 if [[ "$(uname -s)" != "Darwin" ]]; then
   echo "ERROR: Task 20-D2K iOS UI acceptance requires macOS." >&2
   exit 2
 fi
-for command_name in flutter dart xcrun python3 shasum plutil; do
+for command_name in flutter dart xcrun python3 shasum plutil awk grep; do
   command -v "$command_name" >/dev/null 2>&1 || {
     echo "ERROR: $command_name was not found." >&2
     exit 2
   }
 done
+{
+  echo "utc=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+  echo "pwd=$(pwd)"
+  echo "PATH=$PATH"
+  for command_name in flutter dart xcrun python3 shasum plutil awk grep; do
+    echo "$command_name=$(command -v "$command_name")"
+  done
+} > "$LOG_DIR/runner_preflight.log"
+
 if [[ ! -f "$D1_DEVICE_FILE" ]]; then
   echo "ERROR: D1 selected device file was not found: $D1_DEVICE_FILE" >&2
   exit 2
@@ -35,8 +102,6 @@ if [[ -z "$BUNDLE_ID" ]]; then
   exit 2
 fi
 
-# D2K is a persistence/atomicity acceptance, so one deterministic regular-size
-# simulator is sufficient for this case. Visual size coverage remains D2-10.
 selected_line="$(awk -F '\t' '$1 == "regular" {print; exit}' "$D1_DEVICE_FILE")"
 if [[ -z "$selected_line" ]]; then
   selected_line="$(head -n 1 "$D1_DEVICE_FILE")"
@@ -46,10 +111,10 @@ if [[ -z "${udid:-}" ]]; then
   echo "ERROR: No D2K simulator was selected." >&2
   exit 2
 fi
-
 printf '%s\t%s\t%s\t%s\n' "$role" "$udid" "$runtime" "$device_name" > "$LOG_DIR/selected_device.tsv"
 printf '%s\n' "$BUNDLE_ID" > "$LOG_DIR/bundle_id.txt"
 
+set_stage "overlay_preflight"
 python3 "$ROOT/tools/task20_d2k_prepare_ui_acceptance.py" "$APP_DIR"
 (
   set -x
@@ -70,21 +135,6 @@ lock_release="$LOG_DIR/db_lock_release"
 lock_log="$LOG_DIR/db_lock.log"
 mkdir -p "$screenshot_dir"
 rm -f "$lock_ready" "$lock_release"
-trigger_pid=""
-lock_pid=""
-
-cleanup() {
-  touch "$lock_release" >/dev/null 2>&1 || true
-  if [[ -n "${lock_pid:-}" ]] && kill -0 "$lock_pid" >/dev/null 2>&1; then
-    kill "$lock_pid" >/dev/null 2>&1 || true
-  fi
-  if [[ -n "${trigger_pid:-}" ]] && kill -0 "$trigger_pid" >/dev/null 2>&1; then
-    kill "$trigger_pid" >/dev/null 2>&1 || true
-  fi
-  xcrun simctl terminate "$udid" "$BUNDLE_ID" >/dev/null 2>&1 || true
-  xcrun simctl shutdown "$udid" >/dev/null 2>&1 || true
-}
-trap cleanup EXIT
 
 wait_for_file() {
   local path="$1" timeout_seconds="$2" description="$3"
@@ -116,11 +166,32 @@ wait_for_marker() {
   return 1
 }
 
+capture_host_screenshot() {
+  local filename="$1"
+  local destination="$screenshot_dir/$filename"
+  local log_file="$LOG_DIR/${filename%.png}_host_screenshot.log"
+  local attempt
+  rm -f "$destination"
+  : > "$log_file"
+  for attempt in 1 2 3; do
+    echo "attempt=$attempt" >> "$log_file"
+    if xcrun simctl io "$udid" screenshot "$destination" >> "$log_file" 2>&1 \
+      && [[ -s "$destination" ]]; then
+      return 0
+    fi
+    sleep 1
+  done
+  echo "ERROR: Failed to capture host Simulator screenshot: $destination" >&2
+  return 1
+}
+
+set_stage "simulator_boot"
 xcrun simctl shutdown "$udid" >/dev/null 2>&1 || true
 xcrun simctl erase "$udid"
 xcrun simctl boot "$udid"
 xcrun simctl bootstatus "$udid" -b
 
+set_stage "trigger_launch"
 (
   cd "$APP_DIR"
   TASK20_D2_SCREENSHOT_DIR="$screenshot_dir" \
@@ -133,18 +204,21 @@ xcrun simctl bootstatus "$udid" -b
 ) >"$trigger_log" 2>&1 &
 trigger_pid="$!"
 
-wait_for_marker "$trigger_log" 'D2K_READY_FOR_DB_LOCK' 900
-wait_for_file "$screenshot_dir/D2K_01_ready_before_interruption.png" 30 'D2K ready screenshot'
+# The in-app marker, not the driver screenshot file, is the synchronization
+# primitive. #286 proved the marker was reached while the driver screenshot
+# file was not materialized, and the old runner waited 30 seconds here, letting
+# the reset proceed before the host could acquire its SQLite lock.
+set_stage "ready_marker"
+wait_for_marker "$trigger_log" 'D2K_READY_FOR_DB_LOCK' "$TRIGGER_TIMEOUT_SECONDS"
+capture_host_screenshot 'D2K_01_ready_before_interruption.png'
 
+set_stage "database_discovery"
 data_container="$(xcrun simctl get_app_container "$udid" "$BUNDLE_ID" data)"
 test -d "$data_container"
 printf '%s\n' "$data_container" > "$LOG_DIR/data_container.txt"
 
-# Find the live Drift database by SQLite header + user_account table, acquire
-# BEGIN IMMEDIATE, and hold that write lock until the host releases it after
-# OS-level app termination.
+set_stage "database_lock"
 python3 - "$data_container" "$lock_ready" "$lock_release" >"$lock_log" 2>&1 <<'PY' &
-import os
 import sqlite3
 import sys
 import time
@@ -200,9 +274,13 @@ wait_for_file "$lock_ready" 30 'external SQLite BEGIN IMMEDIATE lock'
 database_path="$(head -n 1 "$lock_ready")"
 printf '%s\n' "$database_path" > "$LOG_DIR/database_path.txt"
 
-wait_for_marker "$trigger_log" 'D2K_RESET_CRITICAL_WINDOW_READY' 90
-wait_for_file "$screenshot_dir/D2K_02_reset_blocked_in_progress.png" 30 'D2K blocked-reset screenshot'
+set_stage "critical_window"
+wait_for_marker "$trigger_log" 'D2K_RESET_CRITICAL_WINDOW_READY' 120
+# Capture acceptance evidence from the Simulator host before terminating the
+# app. This does not depend on integration_test screenshot forwarding.
+capture_host_screenshot 'D2K_02_reset_blocked_in_progress.png'
 
+set_stage "os_termination"
 terminate_status="FAIL"
 if xcrun simctl terminate "$udid" "$BUNDLE_ID" >>"$LOG_DIR/os_termination.log" 2>&1; then
   terminate_status="PASS"
@@ -217,8 +295,7 @@ touch "$lock_release"
 wait "$lock_pid"
 lock_pid=""
 
-# The deliberate process termination should make flutter drive exit. Give it a
-# bounded grace period, then stop only the host-side drive process if needed.
+set_stage "trigger_teardown"
 for _ in $(seq 1 30); do
   if ! kill -0 "$trigger_pid" >/dev/null 2>&1; then
     break
@@ -235,6 +312,7 @@ set -e
 trigger_pid=""
 printf '%s\n' "$trigger_exit_code" > "$LOG_DIR/trigger_exit_code.txt"
 
+set_stage "restart_verification"
 xcrun simctl bootstatus "$udid" -b
 xcrun simctl terminate "$udid" "$BUNDLE_ID" >/dev/null 2>&1 || true
 sleep 2
@@ -253,7 +331,9 @@ sleep 2
         --target=integration_test/task20_d2k_reset_interruption_verify_test.dart \
         -d "$udid"
 )
+capture_host_screenshot 'D2K_03_recovered_after_interruption.png'
 
+set_stage "acceptance_assertions"
 for required in \
   D2K_01_ready_before_interruption.png \
   D2K_02_reset_blocked_in_progress.png \
@@ -278,6 +358,7 @@ grep -Fq 'lock=RELEASED' "$lock_log"
   shasum -a 256 D2K_*.png | sort > "$LOG_DIR/screenshots.sha256"
 )
 
+set_stage "result_write"
 ROLE="$role" UDID="$udid" RUNTIME="$runtime" DEVICE_NAME="$device_name" \
 BUNDLE_ID="$BUNDLE_ID" DATABASE_PATH="$database_path" \
 TRIGGER_EXIT_CODE="$trigger_exit_code" LOG_DIR="$LOG_DIR" python3 - <<'PY'
@@ -316,5 +397,6 @@ result = {
 )
 print(json.dumps(result, ensure_ascii=False, sort_keys=True))
 PY
-
+rm -f "$LOG_DIR/failure.txt"
+set_stage "PASS"
 echo "Task 20-D2K local reset interruption acceptance passed."
