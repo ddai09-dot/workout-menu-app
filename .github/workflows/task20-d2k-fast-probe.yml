@@ -1,0 +1,43 @@
+name: Task 20-D2K Fast Probe
+
+on:
+  push:
+    branches:
+      - agent/task20-d2k-fast-probe-3e2fc31
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: task20-d2k-fast-probe-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  d2k-fast-probe:
+    runs-on: macos-15
+    timeout-minutes: 90
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+
+      - name: Build exact v0.9.22 and run isolated D2K probe
+        shell: bash
+        run: bash tools/run_task20_d2k_fast_probe_ios_ci.sh
+
+      - name: Upload D2K fast-probe evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: task20-d2k-fast-probe-${{ github.run_id }}-attempt-${{ github.run_attempt }}
+          path: |
+            implementation-v0.9.22.zip
+            app/build/task20_b_logs/ios
+            app/build/task20_d1_ios_launch_smoke
+            app/build/task20_d2k_reset_interruption
+            app/build/task20_d2k_fast_probe
+            app/build/ios/iphonesimulator/Runner.app
+          if-no-files-found: warn
+          retention-days: 7
