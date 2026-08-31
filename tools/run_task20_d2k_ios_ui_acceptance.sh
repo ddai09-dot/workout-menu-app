@@ -208,9 +208,8 @@ set_stage "ready_marker"
 wait_for_marker "$trigger_log" 'D2K_READY_FOR_DB_LOCK' "$TRIGGER_TIMEOUT_SECONDS"
 capture_host_screenshot 'D2K_01_ready_before_interruption.png'
 
-# Do not lock SQLite before resetLocalData performs its real Secure Storage
-# replacement-key write. The test-only overlay emits this marker only after
-# that write has completed and before the production DB transaction begins.
+# Wait until the production reset path has performed its real replacement
+# Secure Storage write. Only then may the host acquire the DB write lock.
 set_stage "secure_key_switch_gate"
 wait_for_marker "$trigger_log" 'D2K_SECURE_KEY_SWITCHED_WAITING_FOR_HOST' 120
 
@@ -278,6 +277,14 @@ printf '%s\n' "$database_path" > "$LOG_DIR/database_path.txt"
 
 set_stage "critical_window"
 wait_for_marker "$trigger_log" 'D2K_RESET_CRITICAL_WINDOW_READY' 120
+
+# The gate release marker proves the test-only pause has ended. At that point
+# resetLocalData proceeds to its real DB transaction while BEGIN IMMEDIATE is
+# already held by the host. Give SQLite a short deterministic interval to enter
+# the blocked transaction before terminating the app process.
+set_stage "transaction_blocked"
+wait_for_marker "$trigger_log" 'D2K_SECURE_KEY_GATE_RELEASED' 90
+sleep 2
 capture_host_screenshot 'D2K_02_reset_blocked_in_progress.png'
 
 set_stage "os_termination"
@@ -345,6 +352,7 @@ for required in \
 done
 
 grep -Fq 'D2K_SECURE_KEY_SWITCHED_WAITING_FOR_HOST' "$trigger_log"
+grep -Fq 'D2K_SECURE_KEY_GATE_RELEASED' "$trigger_log"
 grep -Fq 'D2K_RESET_CRITICAL_WINDOW_READY' "$trigger_log"
 grep -Fq 'D2K_VERIFY_METADATA=' "$verify_log"
 grep -Fq 'old_user_owned_rows_preserved":true' "$verify_log"
@@ -374,7 +382,7 @@ log_dir = Path(os.environ['LOG_DIR'])
 result = {
     'task': 'Task 20-D2K local reset interruption',
     'status': 'PASS',
-    'scope': 'one GitHub-hosted iOS Simulator; OS kill after Secure Storage user switch and before reset transaction commit',
+    'scope': 'one GitHub-hosted iOS Simulator; OS kill after Secure Storage user switch while reset DB transaction is blocked',
     'role': os.environ['ROLE'],
     'device_name': os.environ['DEVICE_NAME'],
     'runtime': os.environ['RUNTIME'],
@@ -383,6 +391,7 @@ result = {
     'database_path': os.environ['DATABASE_PATH'],
     'external_write_lock': 'BEGIN IMMEDIATE',
     'secure_store_test_gate': 'PASS',
+    'gate_released_before_os_termination': True,
     'critical_window_marker_seen': True,
     'os_level_terminate': 'PASS',
     'trigger_exit_code_after_expected_os_kill': int(os.environ['TRIGGER_EXIT_CODE']),
