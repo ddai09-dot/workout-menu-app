@@ -4,6 +4,7 @@ set -Eeuo pipefail
 ROOT="${GITHUB_WORKSPACE:-$(pwd)}"
 cd "$ROOT"
 
+# Fast-probe trigger revision: a290dfe secure-key gate orchestration.
 # Materialize the exact v0.9.22 product candidate without running the full
 # multi-hour D2 regression chain. This is diagnostic acceleration only; the
 # exact PR-head full iOS workflow remains the acceptance authority.
