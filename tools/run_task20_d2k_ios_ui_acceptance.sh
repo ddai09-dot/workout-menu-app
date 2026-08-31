@@ -9,9 +9,6 @@ TRIGGER_TIMEOUT_SECONDS="${TASK20_D2K_TRIGGER_TIMEOUT_SECONDS:-1200}"
 VERIFY_TIMEOUT_SECONDS="${TASK20_D2K_VERIFY_TIMEOUT_SECONDS:-600}"
 APP_BUNDLE="$APP_DIR/build/ios/iphonesimulator/Runner.app"
 
-# Preserve the parent-shell PATH handoff evidence written by the v0.9.22
-# wrapper. The old runner deleted this file at startup, which made early CI
-# failures unnecessarily opaque.
 parent_preflight_backup=""
 if [[ -f "$LOG_DIR/parent_preflight.log" ]]; then
   parent_preflight_backup="$(mktemp)"
@@ -120,9 +117,11 @@ python3 "$ROOT/tools/task20_d2k_prepare_ui_acceptance.py" "$APP_DIR"
   set -x
   cd "$APP_DIR"
   flutter pub get
-  dart format integration_test/task20_d2k_reset_interruption_trigger_test.dart \
+  dart format lib/core/security/secure_store.dart \
+    integration_test/task20_d2k_reset_interruption_trigger_test.dart \
     integration_test/task20_d2k_reset_interruption_verify_test.dart
-  flutter analyze integration_test/task20_d2k_reset_interruption_trigger_test.dart \
+  flutter analyze lib/core/security/secure_store.dart \
+    integration_test/task20_d2k_reset_interruption_trigger_test.dart \
     integration_test/task20_d2k_reset_interruption_verify_test.dart
 ) 2>&1 | tee "$LOG_DIR/overlay_preflight.log"
 
@@ -198,19 +197,22 @@ set_stage "trigger_launch"
     flutter drive \
       --keep-app-running \
       --no-dds \
+      --dart-define=TASK20_D2K_TEST_GATE=true \
       --driver=test_driver/task20_d2i_driver.dart \
       --target=integration_test/task20_d2k_reset_interruption_trigger_test.dart \
       -d "$udid"
 ) >"$trigger_log" 2>&1 &
 trigger_pid="$!"
 
-# The in-app marker, not the driver screenshot file, is the synchronization
-# primitive. #286 proved the marker was reached while the driver screenshot
-# file was not materialized, and the old runner waited 30 seconds here, letting
-# the reset proceed before the host could acquire its SQLite lock.
 set_stage "ready_marker"
 wait_for_marker "$trigger_log" 'D2K_READY_FOR_DB_LOCK' "$TRIGGER_TIMEOUT_SECONDS"
 capture_host_screenshot 'D2K_01_ready_before_interruption.png'
+
+# Do not lock SQLite before resetLocalData performs its real Secure Storage
+# replacement-key write. The test-only overlay emits this marker only after
+# that write has completed and before the production DB transaction begins.
+set_stage "secure_key_switch_gate"
+wait_for_marker "$trigger_log" 'D2K_SECURE_KEY_SWITCHED_WAITING_FOR_HOST' 120
 
 set_stage "database_discovery"
 data_container="$(xcrun simctl get_app_container "$udid" "$BUNDLE_ID" data)"
@@ -276,8 +278,6 @@ printf '%s\n' "$database_path" > "$LOG_DIR/database_path.txt"
 
 set_stage "critical_window"
 wait_for_marker "$trigger_log" 'D2K_RESET_CRITICAL_WINDOW_READY' 120
-# Capture acceptance evidence from the Simulator host before terminating the
-# app. This does not depend on integration_test screenshot forwarding.
 capture_host_screenshot 'D2K_02_reset_blocked_in_progress.png'
 
 set_stage "os_termination"
@@ -344,6 +344,7 @@ for required in \
   }
 done
 
+grep -Fq 'D2K_SECURE_KEY_SWITCHED_WAITING_FOR_HOST' "$trigger_log"
 grep -Fq 'D2K_RESET_CRITICAL_WINDOW_READY' "$trigger_log"
 grep -Fq 'D2K_VERIFY_METADATA=' "$verify_log"
 grep -Fq 'old_user_owned_rows_preserved":true' "$verify_log"
@@ -352,6 +353,8 @@ grep -Fq 'replacement_account_absent":true' "$verify_log"
 grep -Fq 'foreign_key_violations":0' "$verify_log"
 grep -Fq 'lock=BEGIN_IMMEDIATE' "$lock_log"
 grep -Fq 'lock=RELEASED' "$lock_log"
+test -s "$LOG_DIR/test_gate_instrumentation.json"
+grep -Fq '"product_zip_changed": false' "$LOG_DIR/test_gate_instrumentation.json"
 
 (
   cd "$screenshot_dir"
@@ -379,6 +382,7 @@ result = {
     'bundle_id': os.environ['BUNDLE_ID'],
     'database_path': os.environ['DATABASE_PATH'],
     'external_write_lock': 'BEGIN IMMEDIATE',
+    'secure_store_test_gate': 'PASS',
     'critical_window_marker_seen': True,
     'os_level_terminate': 'PASS',
     'trigger_exit_code_after_expected_os_kill': int(os.environ['TRIGGER_EXIT_CODE']),
