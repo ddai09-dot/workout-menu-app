@@ -41,11 +41,13 @@ def patch_secure_store_for_d2k(app_dir: Path) -> dict[str, object]:
 
     // Test-only deterministic pause. The real secure-store write above has
     // completed, but LocalAccountRepository.resetLocalData has not yet begun
-    // its database transaction. The host uses this window to acquire
-    // BEGIN IMMEDIATE before allowing the production reset path to continue.
+    // its database transaction. The host acquires BEGIN IMMEDIATE during this
+    // pause, then waits for the release marker before OS termination.
     // ignore: avoid_print
     print('D2K_SECURE_KEY_SWITCHED_WAITING_FOR_HOST');
     await Future<void>.delayed(const Duration(seconds: 60));
+    // ignore: avoid_print
+    print('D2K_SECURE_KEY_GATE_RELEASED');
   }
 """
     count = original.count(marker)
@@ -62,7 +64,8 @@ def patch_secure_store_for_d2k(app_dir: Path) -> dict[str, object]:
         "instrumented_sha256": hashlib.sha256(patched.encode()).hexdigest(),
         "dart_define": "TASK20_D2K_TEST_GATE=true",
         "gate_key": "task20_d2k_gate_armed",
-        "marker": "D2K_SECURE_KEY_SWITCHED_WAITING_FOR_HOST",
+        "waiting_marker": "D2K_SECURE_KEY_SWITCHED_WAITING_FOR_HOST",
+        "release_marker": "D2K_SECURE_KEY_GATE_RELEASED",
         "pause_seconds": 60,
         "product_zip_changed": False,
         "scope": "test-only overlay after canonical v0.9.22 extraction",
