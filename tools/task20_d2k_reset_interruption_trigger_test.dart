@@ -12,6 +12,7 @@ import 'task20_d2i_test_support.dart';
 const String d2kMetadataKey = 'task20_d2k_phase_metadata';
 const String d2kInterruptedReplacementKey =
     'task20_d2k_interrupted_replacement_user_id';
+const String d2kGateArmedKey = 'task20_d2k_gate_armed';
 
 void main() {
   final binding = IntegrationTestWidgetsFlutterBinding.ensureInitialized();
@@ -26,6 +27,7 @@ void main() {
       final initialRuntime = d2iRuntimeContext(tester);
       await initialRuntime.secureStore.delete(d2kMetadataKey);
       await initialRuntime.secureStore.delete(d2kInterruptedReplacementKey);
+      await initialRuntime.secureStore.delete(d2kGateArmedKey);
 
       await completePartialWorkoutForRecords(tester);
       final runtime = d2iRuntimeContext(tester);
@@ -97,19 +99,15 @@ void main() {
       );
       d2iExpectHealthyFrame(tester);
       await binding.takeScreenshot('D2K_01_ready_before_interruption');
+
+      // Arm the test-only SecureStore overlay immediately before initiating the
+      // real reset. The overlay pauses only after resetLocalData has completed
+      // the replacement current_user_id write and before its DB transaction.
+      await runtime.secureStore.write(key: d2kGateArmedKey, value: '1');
       print(
         'D2K_READY_FOR_DB_LOCK oldUserId=$oldUserId '
         'nonZeroTables=${nonZeroTables.length}',
       );
-
-      // The host acquires BEGIN IMMEDIATE on the app database after the marker
-      // above. Keeping this same app process alive avoids launching under the
-      // external lock and makes the interruption point deterministic.
-      final hostLockDeadline =
-          DateTime.now().add(const Duration(seconds: 20));
-      while (DateTime.now().isBefore(hostLockDeadline)) {
-        await tester.pump(const Duration(milliseconds: 250));
-      }
 
       await d2iTapText(tester, '端末内データを削除');
       await d2iWaitForText(tester, 'すべて削除しますか？');
@@ -126,6 +124,10 @@ void main() {
         }
       }
       expect(interruptedReplacementUserId, isNotNull);
+
+      // Disarm before any recovery/restart SecureStore writes. The in-flight
+      // replacement write remains paused by its already-entered 60s gate.
+      await runtime.secureStore.write(key: d2kGateArmedKey, value: '0');
       await runtime.secureStore.write(
         key: d2kInterruptedReplacementKey,
         value: interruptedReplacementUserId!,
@@ -148,9 +150,9 @@ void main() {
         'replacementUserId=$interruptedReplacementUserId',
       );
 
-      // The host-side runner terminates the app at this marker while the
-      // external SQLite write lock prevents the reset transaction from
-      // committing. OS termination is the expected end of this phase.
+      // The host-side runner acquires BEGIN IMMEDIATE during the test gate and
+      // terminates the app at this marker. Once the gate delay expires, the
+      // production reset transaction remains blocked until OS termination.
       while (true) {
         await tester.pump(const Duration(seconds: 1));
       }
