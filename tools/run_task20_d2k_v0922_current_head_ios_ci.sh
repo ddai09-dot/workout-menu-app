@@ -20,10 +20,88 @@ test -x "$flutter_bin_directory/flutter"
 test -x "$flutter_bin_directory/dart"
 export PATH="$flutter_bin_directory:$PATH"
 
+# D2A..D2J acceptance helpers intentionally overlay files under app/. D2K's
+# SecureStore instrumentation must start from the canonical v0.9.22 source,
+# otherwise a previous lane can invalidate its exact source precondition.
+# Preserve all prior CI evidence/build products, restore the exact candidate
+# package, then put the build tree back before D2K starts.
+candidate_zip="$ROOT/implementation-v0.9.22.zip"
+expected_candidate_sha="714b56ed1f074f22a500932719d75398ecfbc1c853da74e01eda85c4601fa6eb"
+if [[ ! -s "$candidate_zip" ]]; then
+  echo "ERROR: canonical v0.9.22 candidate ZIP missing after D2J: $candidate_zip" >&2
+  exit 2
+fi
+actual_candidate_sha="$(shasum -a 256 "$candidate_zip" | awk '{print $1}')"
+if [[ "$actual_candidate_sha" != "$expected_candidate_sha" ]]; then
+  echo "ERROR: canonical v0.9.22 candidate ZIP SHA mismatch: $actual_candidate_sha" >&2
+  exit 2
+fi
+
+preserve_root="$(mktemp -d "$ROOT/.task20-d2k-preserve.XXXXXX")"
+if [[ ! -d "$ROOT/app/build" ]]; then
+  echo "ERROR: D2J build/evidence tree missing before D2K source reset." >&2
+  rm -rf "$preserve_root"
+  exit 2
+fi
+mv "$ROOT/app/build" "$preserve_root/build"
+if ! (
+  rm -rf "$ROOT/app"
+  mkdir -p "$ROOT/app"
+  unzip -q "$candidate_zip" -d "$ROOT/app"
+); then
+  echo "ERROR: failed to restore canonical v0.9.22 source for D2K." >&2
+  mkdir -p "$ROOT/app"
+  rm -rf "$ROOT/app/build"
+  mv "$preserve_root/build" "$ROOT/app/build"
+  rm -rf "$preserve_root"
+  exit 2
+fi
+mv "$preserve_root/build" "$ROOT/app/build"
+rm -rf "$preserve_root"
+
+# The exact SecureStore marker is the contract consumed by the D2K overlay.
+# Fail here with explicit evidence instead of an opaque overlay-preflight exit.
+secure_store_file="$ROOT/app/lib/core/security/secure_store.dart"
+source_reset_marker_count="$(python3 - "$secure_store_file" <<'PY'
+from pathlib import Path
+import sys
+
+path = Path(sys.argv[1])
+text = path.read_text(encoding="utf-8")
+marker = """  @override
+  Future<void> write({
+    required String key,
+    required String value,
+  }) {
+    return _storage.write(key: key, value: value);
+  }
+"""
+print(text.count(marker))
+PY
+)"
+if [[ "$source_reset_marker_count" != "1" ]]; then
+  echo "ERROR: D2K SecureStore marker count after canonical source reset: $source_reset_marker_count" >&2
+  exit 2
+fi
+
+# app/build was restored, so the pinned Flutter record and all accepted D2J
+# evidence remain available to this run and to the final workflow artifact.
+flutter_result_file="$ROOT/app/build/task20_b_logs/ios/flutter_sdk_install.json"
+test -s "$flutter_result_file"
+
 d2k_log_dir="$ROOT/app/build/task20_d2k_reset_interruption"
 wrapper_log_dir="$ROOT/app/build/task20_d2k_wrapper"
 mkdir -p "$d2k_log_dir" "$wrapper_log_dir"
 rm -rf "$wrapper_log_dir"/*
+{
+  echo "utc=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+  echo "source_reset=canonical_v0.9.22_zip"
+  echo "candidate_zip=$candidate_zip"
+  echo "candidate_sha256=$actual_candidate_sha"
+  echo "secure_store_sha256=$(shasum -a 256 "$secure_store_file" | awk '{print $1}')"
+  echo "secure_store_marker_count=$source_reset_marker_count"
+  echo "d2j_build_evidence_restored=true"
+} > "$wrapper_log_dir/source_reset_preflight.log"
 
 write_wrapper_preflight() {
   local attempt="$1"
