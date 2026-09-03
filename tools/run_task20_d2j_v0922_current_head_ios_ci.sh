@@ -30,7 +30,7 @@ TASK20_D2G_DRIVE_TIMEOUT_SECONDS=1500 TASK20_D2G_LOG_DIR="$ROOT/app/build/task20
   bash tools/run_task20_d2g_ios_ui_acceptance.sh "$ROOT/app"
 TASK20_D2F_DRIVE_TIMEOUT_SECONDS=1500 TASK20_D2F_LOG_DIR="$ROOT/app/build/task20_d2f_records_progression" \
   bash tools/run_task20_d2f_ios_ui_acceptance.sh "$ROOT/app"
-TASK20_D2E_DRIVE_TIMEOUT_SECONDS=720 TASK20_D2E_LOG_DIR="$ROOT/app/build/task20_d2e_workout_core_flow" \
+TASK20_D2E_DRIVE_TIMEOUT_SECONDS=720 TASK20_D2E_MAX_STARTUP_ATTEMPTS=3 TASK20_D2E_LOG_DIR="$ROOT/app/build/task20_d2e_workout_core_flow" \
   bash tools/run_task20_d2e_ios_ui_acceptance.sh "$ROOT/app"
 TASK20_D2_LOG_DIR="$ROOT/app/build/task20_d2a_ios_ui_acceptance" bash tools/run_task20_d2a_ios_ui_acceptance.sh "$ROOT/app"
 TASK20_D2C_DRIVE_TIMEOUT_SECONDS=480 TASK20_D2C_MAX_STARTUP_ATTEMPTS=3 TASK20_D2C_LOG_DIR="$ROOT/app/build/task20_d2c_onboarding_resume" \
