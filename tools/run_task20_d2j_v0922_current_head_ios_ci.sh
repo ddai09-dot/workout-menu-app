@@ -33,7 +33,8 @@ TASK20_D2F_DRIVE_TIMEOUT_SECONDS=1500 TASK20_D2F_LOG_DIR="$ROOT/app/build/task20
 TASK20_D2E_DRIVE_TIMEOUT_SECONDS=720 TASK20_D2E_LOG_DIR="$ROOT/app/build/task20_d2e_workout_core_flow" \
   bash tools/run_task20_d2e_ios_ui_acceptance.sh "$ROOT/app"
 TASK20_D2_LOG_DIR="$ROOT/app/build/task20_d2a_ios_ui_acceptance" bash tools/run_task20_d2a_ios_ui_acceptance.sh "$ROOT/app"
-TASK20_D2C_LOG_DIR="$ROOT/app/build/task20_d2c_onboarding_resume" bash tools/run_task20_d2c_ios_ui_acceptance.sh "$ROOT/app"
+TASK20_D2C_DRIVE_TIMEOUT_SECONDS=480 TASK20_D2C_MAX_STARTUP_ATTEMPTS=3 TASK20_D2C_LOG_DIR="$ROOT/app/build/task20_d2c_onboarding_resume" \
+  bash tools/run_task20_d2c_ios_ui_acceptance.sh "$ROOT/app"
 TASK20_D2D_LOG_DIR="$ROOT/app/build/task20_d2d_weekly_planner_resume" bash tools/run_task20_d2d_ios_ui_acceptance.sh "$ROOT/app"
 
 python3 tools/task20_c3_verify_analyzer_clean.py app/build/task20_b_logs/ios/flutter_checks/flutter_analyze.log app/tools/run_task20_b_flutter_checks.sh
