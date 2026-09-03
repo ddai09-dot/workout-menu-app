@@ -23,8 +23,9 @@ export PATH="$flutter_bin_directory:$PATH"
 # D2A..D2J acceptance helpers intentionally overlay files under app/. D2K's
 # SecureStore instrumentation must start from the canonical v0.9.22 source,
 # otherwise a previous lane can invalidate its exact source precondition.
-# Preserve all prior CI evidence/build products, restore the exact candidate
-# package, then put the build tree back before D2K starts.
+# Preserve all prior CI evidence/build products and the D2J-generated iOS host
+# project, restore the exact candidate package, then put both generated trees
+# back before D2K starts. The canonical ZIP intentionally does not contain ios/.
 candidate_zip="$ROOT/implementation-v0.9.22.zip"
 expected_candidate_sha="714b56ed1f074f22a500932719d75398ecfbc1c853da74e01eda85c4601fa6eb"
 if [[ ! -s "$candidate_zip" ]]; then
@@ -43,7 +44,13 @@ if [[ ! -d "$ROOT/app/build" ]]; then
   rm -rf "$preserve_root"
   exit 2
 fi
+if [[ ! -f "$ROOT/app/ios/Runner.xcodeproj/project.pbxproj" ]]; then
+  echo "ERROR: D2J-generated iOS host project missing before D2K source reset." >&2
+  rm -rf "$preserve_root"
+  exit 2
+fi
 mv "$ROOT/app/build" "$preserve_root/build"
+mv "$ROOT/app/ios" "$preserve_root/ios"
 if ! (
   rm -rf "$ROOT/app"
   mkdir -p "$ROOT/app"
@@ -51,13 +58,20 @@ if ! (
 ); then
   echo "ERROR: failed to restore canonical v0.9.22 source for D2K." >&2
   mkdir -p "$ROOT/app"
-  rm -rf "$ROOT/app/build"
+  rm -rf "$ROOT/app/build" "$ROOT/app/ios"
   mv "$preserve_root/build" "$ROOT/app/build"
+  mv "$preserve_root/ios" "$ROOT/app/ios"
   rm -rf "$preserve_root"
   exit 2
 fi
 mv "$preserve_root/build" "$ROOT/app/build"
+mv "$preserve_root/ios" "$ROOT/app/ios"
 rm -rf "$preserve_root"
+
+if [[ ! -f "$ROOT/app/ios/Runner.xcodeproj/project.pbxproj" ]]; then
+  echo "ERROR: D2J-generated iOS host project was not restored after D2K source reset." >&2
+  exit 2
+fi
 
 # The exact SecureStore marker is the contract consumed by the D2K overlay.
 # Fail here with explicit evidence instead of an opaque overlay-preflight exit.
@@ -84,8 +98,9 @@ if [[ "$source_reset_marker_count" != "1" ]]; then
   exit 2
 fi
 
-# app/build was restored, so the pinned Flutter record and all accepted D2J
-# evidence remain available to this run and to the final workflow artifact.
+# app/build and the generated iOS host project were restored, so the pinned
+# Flutter record, accepted D2J evidence, and an executable flutter-drive host
+# project remain available while Dart product source is canonical v0.9.22.
 flutter_result_file="$ROOT/app/build/task20_b_logs/ios/flutter_sdk_install.json"
 test -s "$flutter_result_file"
 
@@ -101,6 +116,9 @@ rm -rf "$wrapper_log_dir"/*
   echo "secure_store_sha256=$(shasum -a 256 "$secure_store_file" | awk '{print $1}')"
   echo "secure_store_marker_count=$source_reset_marker_count"
   echo "d2j_build_evidence_restored=true"
+  echo "d2j_generated_ios_restored=true"
+  echo "ios_project_file=$ROOT/app/ios/Runner.xcodeproj/project.pbxproj"
+  echo "ios_project_sha256=$(shasum -a 256 "$ROOT/app/ios/Runner.xcodeproj/project.pbxproj" | awk '{print $1}')"
 } > "$wrapper_log_dir/source_reset_preflight.log"
 
 write_wrapper_preflight() {
