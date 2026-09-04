@@ -166,6 +166,40 @@ Future<void> tapTooltip(WidgetTester tester, String tooltip) async {
   );
 }
 
+Offset _forwardDragOffset(AxisDirection direction, double delta) {
+  switch (direction) {
+    case AxisDirection.down:
+      return Offset(0, -delta);
+    case AxisDirection.up:
+      return Offset(0, delta);
+    case AxisDirection.right:
+      return Offset(-delta, 0);
+    case AxisDirection.left:
+      return Offset(delta, 0);
+  }
+}
+
+Future<bool> _scrollPrimaryVerticalScrollableForward(
+  WidgetTester tester, {
+  double delta = 240,
+}) async {
+  final scrollables = find.byType(Scrollable).hitTestable();
+  for (final element in scrollables.evaluate()) {
+    final scrollable = element.widget as Scrollable;
+    if (scrollable.axisDirection == AxisDirection.down ||
+        scrollable.axisDirection == AxisDirection.up) {
+      final finder = find.byElementPredicate((candidate) => candidate == element);
+      await tester.drag(
+        finder,
+        _forwardDragOffset(scrollable.axisDirection, delta),
+      );
+      await tester.pump(const Duration(milliseconds: 300));
+      return true;
+    }
+  }
+  return false;
+}
+
 Future<void> tapFinder(
   WidgetTester tester,
   Finder finder, {
@@ -183,6 +217,7 @@ Future<void> tapFinder(
       await waitForOnboardingSavingToFinish(tester);
       return;
     }
+    await _scrollPrimaryVerticalScrollableForward(tester);
   }
   throw TestFailure('Timed out waiting to tap: $description');
 }
