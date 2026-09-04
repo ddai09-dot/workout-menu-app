@@ -48,8 +48,11 @@ jobs:
 
       - name: Run Task 20-B Flutter checks
         shell: bash
-        working-directory: app
-        run: ./tools/run_task20_b_flutter_checks.sh
+        run: |
+          set -Eeuo pipefail
+          bash tools/run_task20_with_v0922_lock_shim.sh \
+            "$GITHUB_WORKSPACE/app" \
+            bash "$GITHUB_WORKSPACE/app/tools/run_task20_b_flutter_checks.sh"
 
       - name: Verify Task 20-C3 clean analyzer gate
         shell: bash
