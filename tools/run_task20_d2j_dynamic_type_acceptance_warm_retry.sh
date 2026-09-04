@@ -33,6 +33,15 @@ if blob_sha != expected_blob_sha:
     )
 
 text = raw.decode("utf-8")
+old_attempt_var = 'MAX_STARTUP_ATTEMPTS="${TASK20_D2J_MAX_STARTUP_ATTEMPTS:-2}"\n'
+new_attempt_var = (
+    old_attempt_var
+    + 'D2D_PHASE1_MAX_STARTUP_ATTEMPTS="${TASK20_D2J_D2D_PHASE1_MAX_STARTUP_ATTEMPTS:-3}"\n'
+)
+if text.count(old_attempt_var) != 1:
+    raise SystemExit("Expected exactly one D2J startup-attempt variable")
+text = text.replace(old_attempt_var, new_attempt_var, 1)
+
 old_function = '''prepare_fresh_device() {
   local evidence_dir="$1"
   xcrun simctl shutdown "$UDID" >/dev/null 2>&1 || true
@@ -90,6 +99,32 @@ if call_count != 2:
         f"Expected exactly two fresh-device attempt calls; found {call_count}"
     )
 text = text.replace(old_call, new_call)
+
+# The latest failed exact-head run exhausted two D2D phase-1 attempts before
+# the test connected to the VM service. Allow one additional attempt only for
+# this phase; its existing retry predicate still requires a pre-test startup
+# failure with zero screenshots, so app/test assertion failures are not retried.
+d2d_start = text.index("run_d2d_case() {")
+phase2_start = text.index("  local phase2_success=0", d2d_start)
+phase1 = text[d2d_start:phase2_start]
+old_loop = '  for attempt in $(seq 1 "$MAX_STARTUP_ATTEMPTS"); do\n'
+if phase1.count(old_loop) != 1:
+    raise SystemExit("Expected exactly one D2D phase1 attempt loop")
+phase1 = phase1.replace(
+    old_loop,
+    '  for attempt in $(seq 1 "$D2D_PHASE1_MAX_STARTUP_ATTEMPTS"); do\n',
+    1,
+)
+old_limit = '       [[ "$attempt" -lt "$MAX_STARTUP_ATTEMPTS" ]]; then\n'
+if phase1.count(old_limit) != 1:
+    raise SystemExit("Expected exactly one D2D phase1 retry limit")
+phase1 = phase1.replace(
+    old_limit,
+    '       [[ "$attempt" -lt "$D2D_PHASE1_MAX_STARTUP_ATTEMPTS" ]]; then\n',
+    1,
+)
+text = text[:d2d_start] + phase1 + text[phase2_start:]
+
 destination.write_text(text, encoding="utf-8")
 metadata_path.write_text(
     json.dumps(
@@ -102,6 +137,9 @@ metadata_path.write_text(
             "generated_runner_location_preserves_repo_root": True,
             "fresh_attempt_calls_replaced": call_count,
             "retry_reset_mode": "warm-retry-no-erase",
+            "d2d_phase1_max_startup_attempts": 3,
+            "d2d_phase1_retry_scope": "pre-test debug launch failures with zero screenshots only",
+            "test_or_app_failures_retried": False,
             "warm_retry_resets": [
                 "app process terminate",
                 "app uninstall",
