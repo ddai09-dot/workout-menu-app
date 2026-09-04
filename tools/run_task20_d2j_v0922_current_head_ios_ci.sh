@@ -18,7 +18,9 @@ flutter_bin_directory="$(python3 -c 'import json,sys; from pathlib import Path; 
 test -x "$flutter_bin_directory/flutter"
 export PATH="$flutter_bin_directory:$PATH"
 
-(cd app && ./tools/run_task20_b_ios_simulator.sh)
+bash tools/run_task20_with_v0922_lock_shim.sh \
+  "$ROOT/app" \
+  bash "$ROOT/app/tools/run_task20_b_ios_simulator.sh"
 
 TASK20_D1_LOG_DIR="$ROOT/app/build/task20_d1_ios_launch_smoke" \
   bash tools/task20_d1_ios_launch_smoke.sh "$ROOT/app/build/ios/iphonesimulator/Runner.app"
