@@ -73,6 +73,10 @@ if [[ ! -f "$ROOT/app/ios/Runner.xcodeproj/project.pbxproj" ]]; then
   exit 2
 fi
 
+# Reapply the exact accepted CI-only lock after the canonical source reset.
+# This does not modify the product ZIP or pubspec.yaml.
+python3 tools/task20_restore_v0922_ci_lock.py "$ROOT/app"
+
 # The exact SecureStore marker is the contract consumed by the D2K overlay.
 # Fail here with explicit evidence instead of an opaque overlay-preflight exit.
 secure_store_file="$ROOT/app/lib/core/security/secure_store.dart"
@@ -113,6 +117,7 @@ rm -rf "$wrapper_log_dir"/*
   echo "source_reset=canonical_v0.9.22_zip"
   echo "candidate_zip=$candidate_zip"
   echo "candidate_sha256=$actual_candidate_sha"
+  echo "pubspec_lock_sha256=$(shasum -a 256 "$ROOT/app/pubspec.lock" | awk '{print $1}')"
   echo "secure_store_sha256=$(shasum -a 256 "$secure_store_file" | awk '{print $1}')"
   echo "secure_store_marker_count=$source_reset_marker_count"
   echo "d2j_build_evidence_restored=true"
