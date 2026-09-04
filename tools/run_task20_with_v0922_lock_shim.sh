@@ -10,6 +10,21 @@ if [[ "$#" -eq 0 ]]; then
 fi
 
 APP_DIR="$(cd "$APP_DIR" && pwd)"
+EXPECTED_LOCK_SHA256="2b9fd241e021b09d40222cc738da578620fda952591bfc66d95ef08d1beef599"
+LOCK_PATH="$APP_DIR/pubspec.lock"
+if [[ -f "$LOCK_PATH" ]]; then
+  current_lock_sha="$(shasum -a 256 "$LOCK_PATH" | awk '{print $1}')"
+  if [[ "$current_lock_sha" != "$EXPECTED_LOCK_SHA256" ]]; then
+    echo "ERROR: refusing to hide unexpected pubspec.lock before canonical verification: $current_lock_sha" >&2
+    exit 2
+  fi
+  rm "$LOCK_PATH"
+fi
+if [[ -e "$LOCK_PATH" ]]; then
+  echo "ERROR: pubspec.lock must be absent during canonical package verification." >&2
+  exit 2
+fi
+
 REAL_FLUTTER="$(command -v flutter || true)"
 if [[ -z "$REAL_FLUTTER" || ! -x "$REAL_FLUTTER" ]]; then
   echo "ERROR: real flutter executable was not found before lock shim setup." >&2
