@@ -46,8 +46,11 @@ jobs:
 
       - name: Run Task 20-B iOS Simulator checks
         shell: bash
-        working-directory: app
-        run: ./tools/run_task20_b_ios_simulator.sh
+        run: |
+          set -Eeuo pipefail
+          bash tools/run_task20_with_v0922_lock_shim.sh \
+            "$GITHUB_WORKSPACE/app" \
+            bash "$GITHUB_WORKSPACE/app/tools/run_task20_b_ios_simulator.sh"
 
       - name: Run Task 20-D1 iOS launch smoke
         shell: bash
