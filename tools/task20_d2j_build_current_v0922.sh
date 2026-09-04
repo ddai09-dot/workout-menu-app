@@ -147,3 +147,9 @@ python3 app/tools/verify_project_consistency.py
 python3 app/tools/verify_weekly_algorithm_traceability.py
 python3 app/tools/verify_task20_b_execution_lane.py
 test "$(shasum -a 256 implementation-v0.9.22.zip | awk '{print $1}')" = "714b56ed1f074f22a500932719d75398ecfbc1c853da74e01eda85c4601fa6eb"
+
+# The canonical product ZIP intentionally excludes pubspec.lock. Restore the
+# exact lock from the last accepted v0.9.22 CI evidence into the transient CI
+# workspace only, so fresh package-index drift cannot silently change the
+# verified toolchain while the canonical ZIP remains byte-for-byte unchanged.
+python3 tools/task20_restore_v0922_ci_lock.py "$ROOT/app"
