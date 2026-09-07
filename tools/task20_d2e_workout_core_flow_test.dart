@@ -110,6 +110,22 @@ Future<void> waitForWorkoutStartReady(
   );
 }
 
+Future<void> waitForTextAbsent(
+  WidgetTester tester,
+  String text, {
+  Duration timeout = const Duration(seconds: 30),
+}) async {
+  final finder = find.text(text);
+  final deadline = DateTime.now().add(timeout);
+  while (DateTime.now().isBefore(deadline)) {
+    await tester.pump(const Duration(milliseconds: 250));
+    if (finder.evaluate().isEmpty) {
+      return;
+    }
+  }
+  throw TestFailure('Timed out waiting for text to disappear: $text');
+}
+
 Future<void> scrollToText(
   WidgetTester tester,
   String text, {
@@ -257,6 +273,11 @@ void main() {
         tester,
         '今日やること',
         timeout: const Duration(seconds: 90),
+      );
+      await waitForTextAbsent(
+        tester,
+        '終了後の記録',
+        timeout: const Duration(seconds: 30),
       );
       expect(find.text('トレーニング中'), findsNothing);
       expect(find.text('終了後の記録'), findsNothing);
