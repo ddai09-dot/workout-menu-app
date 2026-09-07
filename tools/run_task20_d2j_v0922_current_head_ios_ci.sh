@@ -22,6 +22,21 @@ bash tools/run_task20_with_v0922_lock_shim.sh \
   "$ROOT/app" \
   bash "$ROOT/app/tools/run_task20_b_ios_simulator.sh"
 
+# Acceptance overlays add Flutter Driver/integration-test dependencies. Keep the
+# already accepted drift_dev tool version exact while those transient overlays
+# repeatedly run `flutter pub get`, then restore the canonical compatible range
+# before the C4 gate. The canonical ZIP/product source is never changed.
+transient_pin_active=false
+restore_transient_pin() {
+  if [[ "$transient_pin_active" == true ]]; then
+    python3 tools/task20_c4_transient_pin.py restore "$ROOT/app/pubspec.yaml"
+    transient_pin_active=false
+  fi
+}
+python3 tools/task20_c4_transient_pin.py pin "$ROOT/app/pubspec.yaml"
+transient_pin_active=true
+trap restore_transient_pin EXIT
+
 TASK20_D1_LOG_DIR="$ROOT/app/build/task20_d1_ios_launch_smoke" \
   bash tools/task20_d1_ios_launch_smoke.sh "$ROOT/app/build/ios/iphonesimulator/Runner.app"
 TASK20_D2H_DRIVE_TIMEOUT_SECONDS=1500 TASK20_D2H_MAX_STARTUP_ATTEMPTS=2 TASK20_D2H_LOG_DIR="$ROOT/app/build/task20_d2h_restart_persistence" \
@@ -35,10 +50,13 @@ TASK20_D2F_DRIVE_TIMEOUT_SECONDS=1500 TASK20_D2F_LOG_DIR="$ROOT/app/build/task20
 TASK20_D2E_DRIVE_TIMEOUT_SECONDS=720 TASK20_D2E_MAX_STARTUP_ATTEMPTS=3 TASK20_D2E_LOG_DIR="$ROOT/app/build/task20_d2e_workout_core_flow" \
   bash tools/run_task20_d2e_ios_ui_acceptance.sh "$ROOT/app"
 TASK20_D2_MAX_STARTUP_ATTEMPTS=3 TASK20_D2_LOG_DIR="$ROOT/app/build/task20_d2a_ios_ui_acceptance" \
-  bash tools/run_task20_d2a_ios_ui_acceptance.sh "$ROOT/app"
+  bash tools/run_task20_d2a_ios_ui_acceptance_warm_retry.sh "$ROOT/app"
 TASK20_D2C_DRIVE_TIMEOUT_SECONDS=480 TASK20_D2C_MAX_STARTUP_ATTEMPTS=3 TASK20_D2C_LOG_DIR="$ROOT/app/build/task20_d2c_onboarding_resume" \
   bash tools/run_task20_d2c_ios_ui_acceptance.sh "$ROOT/app"
 TASK20_D2D_LOG_DIR="$ROOT/app/build/task20_d2d_weekly_planner_resume" bash tools/run_task20_d2d_ios_ui_acceptance.sh "$ROOT/app"
+
+restore_transient_pin
+trap - EXIT
 
 python3 tools/task20_c3_verify_analyzer_clean.py app/build/task20_b_logs/ios/flutter_checks/flutter_analyze.log app/tools/run_task20_b_flutter_checks.sh
 python3 tools/task20_c4_verify_dependency_resolution.py app/pubspec.yaml app/pubspec.lock
