@@ -17,6 +17,16 @@ def _replace_once(target: Path, marker: str, replacement: str, label: str) -> No
     target.write_text(text.replace(marker, replacement, 1), encoding="utf-8")
 
 
+def _require_once(target: Path, marker: str, label: str) -> None:
+    if not target.is_file():
+        raise SystemExit(f"{label} integration test overlay not found: {target}")
+    text = target.read_text(encoding="utf-8")
+    if text.count(marker) != 1:
+        raise SystemExit(
+            f"Expected exactly one {label} marker; found {text.count(marker)}"
+        )
+
+
 def main() -> int:
     if len(sys.argv) != 2:
         raise SystemExit("usage: task20_d2j_inject_basic_info_screenshot.py <app-dir>")
@@ -34,32 +44,24 @@ def main() -> int:
     _replace_once(d2a, d2a_marker, d2a_replacement, "first-basic-info D2A")
 
     d2e = app_dir / "integration_test" / "task20_d2e_workout_core_flow_test.dart"
-    d2e_marker = (
+    d2e_transition_guard = (
         "      await waitForText(\n"
         "        tester,\n"
         "        '今日やること',\n"
         "        timeout: const Duration(seconds: 90),\n"
         "      );\n"
-        "      expect(find.text('トレーニング中'), findsNothing);\n"
-        "      expect(find.text('終了後の記録'), findsNothing);"
-    )
-    d2e_replacement = (
-        "      await waitForText(\n"
+        "      await waitForTextAbsent(\n"
         "        tester,\n"
-        "        '今日やること',\n"
-        "        timeout: const Duration(seconds: 90),\n"
+        "        '終了後の記録',\n"
+        "        timeout: const Duration(seconds: 30),\n"
         "      );\n"
-        "      final d2jTransitionDeadline = DateTime.now().add(\n"
-        "        const Duration(seconds: 10),\n"
-        "      );\n"
-        "      while (DateTime.now().isBefore(d2jTransitionDeadline) &&\n"
-        "          find.text('終了後の記録').evaluate().isNotEmpty) {\n"
-        "        await tester.pump(const Duration(milliseconds: 250));\n"
-        "      }\n"
         "      expect(find.text('トレーニング中'), findsNothing);\n"
         "      expect(find.text('終了後の記録'), findsNothing);"
     )
-    _replace_once(d2e, d2e_marker, d2e_replacement, "D2E completion transition")
+    # D2E now owns the transition-settling wait. D2J must verify that exact
+    # accepted guard instead of replacing the obsolete pre-wait source block.
+    # Keep the uniqueness check so source drift cannot silently weaken D2J.
+    _require_once(d2e, d2e_transition_guard, "D2E completion transition guard")
 
     d2g = app_dir / "integration_test" / "task20_d2g_my_page_settings_test.dart"
     d2g_marker = (
@@ -75,7 +77,7 @@ def main() -> int:
     )
     _replace_once(d2g, d2g_marker, d2g_replacement, "D2G restriction dropdown")
 
-    print(f"Injected D2J screenshot and transition/overflow guards into {app_dir}")
+    print(f"Injected D2J screenshot/overflow guards and verified D2E transition guard in {app_dir}")
     return 0
 
 
