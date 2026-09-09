@@ -51,18 +51,33 @@ def patch_secure_store_for_d2k(app_dir: Path) -> dict[str, object]:
     print('D2K_SECURE_KEY_GATE_RELEASED');
   }
 """
-    count = original.count(marker)
-    if count != 1:
+    marker_count = original.count(marker)
+    replacement_count = original.count(replacement)
+    already_instrumented = False
+
+    if marker_count == 1 and replacement_count == 0:
+        canonical = original
+        patched = original.replace(marker, replacement, 1)
+        secure_store.write_text(patched, encoding="utf-8")
+    elif marker_count == 0 and replacement_count == 1:
+        # The outer iOS runner can retry after a simulator/startup failure
+        # without re-extracting the canonical application tree. In that case
+        # the D2K test-only overlay is already present and must be reusable.
+        already_instrumented = True
+        patched = original
+        canonical = original.replace(replacement, marker, 1)
+    else:
         raise SystemExit(
             "D2K secure-store instrumentation precondition mismatch: "
-            f"expected exactly one write method marker, found {count}"
+            f"expected canonical=(1,0) or already-instrumented=(0,1), "
+            f"found marker={marker_count}, instrumented={replacement_count}"
         )
-    patched = original.replace(marker, replacement, 1)
-    secure_store.write_text(patched, encoding="utf-8")
+
     return {
         "path": str(secure_store.relative_to(app_dir)),
-        "original_sha256": hashlib.sha256(original.encode()).hexdigest(),
+        "original_sha256": hashlib.sha256(canonical.encode()).hexdigest(),
         "instrumented_sha256": hashlib.sha256(patched.encode()).hexdigest(),
+        "already_instrumented": already_instrumented,
         "dart_define": "TASK20_D2K_TEST_GATE=true",
         "gate_key": "task20_d2k_gate_armed",
         "waiting_marker": "D2K_SECURE_KEY_SWITCHED_WAITING_FOR_HOST",
