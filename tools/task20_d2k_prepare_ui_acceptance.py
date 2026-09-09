@@ -6,6 +6,7 @@ import json
 import shutil
 import subprocess
 import sys
+import traceback
 from pathlib import Path
 
 
@@ -81,15 +82,33 @@ def main() -> int:
     if not (app_dir / "pubspec.yaml").is_file():
         raise SystemExit(f"pubspec.yaml not found: {app_dir / 'pubspec.yaml'}")
 
-    subprocess.run(
+    evidence_dir = app_dir / "build" / "task20_d2k_reset_interruption"
+    evidence_dir.mkdir(parents=True, exist_ok=True)
+    stage_file = evidence_dir / "prepare_stage.txt"
+
+    stage_file.write_text("d2i_prepare\n", encoding="utf-8")
+    d2i_result = subprocess.run(
         [
             sys.executable,
             str(repo_root / "tools" / "task20_d2i_prepare_ui_acceptance.py"),
             str(app_dir),
         ],
-        check=True,
+        check=False,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        text=True,
     )
+    (evidence_dir / "d2i_prepare.log").write_text(
+        d2i_result.stdout or "",
+        encoding="utf-8",
+    )
+    if d2i_result.returncode != 0:
+        raise SystemExit(
+            f"Task 20-D2I overlay preparation failed with exit {d2i_result.returncode}; "
+            f"see {evidence_dir / 'd2i_prepare.log'}"
+        )
 
+    stage_file.write_text("copy_d2k_tests\n", encoding="utf-8")
     source_files = {
         repo_root / "tools" / "task20_d2k_reset_interruption_trigger_test.dart":
             app_dir / "integration_test" / "task20_d2k_reset_interruption_trigger_test.dart",
@@ -102,18 +121,30 @@ def main() -> int:
         destination.parent.mkdir(parents=True, exist_ok=True)
         shutil.copyfile(source, destination)
 
+    stage_file.write_text("secure_store_instrumentation\n", encoding="utf-8")
     instrumentation = patch_secure_store_for_d2k(app_dir)
-    evidence_dir = app_dir / "build" / "task20_d2k_reset_interruption"
-    evidence_dir.mkdir(parents=True, exist_ok=True)
     (evidence_dir / "test_gate_instrumentation.json").write_text(
         json.dumps(instrumentation, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
         encoding="utf-8",
     )
 
+    stage_file.write_text("PASS\n", encoding="utf-8")
     print(f"Prepared Task 20-D2K test overlay in {app_dir}")
     print(json.dumps(instrumentation, ensure_ascii=False, sort_keys=True))
     return 0
 
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    try:
+        exit_code = main()
+    except BaseException as error:
+        if len(sys.argv) == 2:
+            app_dir = Path(sys.argv[1]).resolve()
+            evidence_dir = app_dir / "build" / "task20_d2k_reset_interruption"
+            evidence_dir.mkdir(parents=True, exist_ok=True)
+            (evidence_dir / "prepare_failure.log").write_text(
+                "".join(traceback.format_exception(type(error), error, error.__traceback__)),
+                encoding="utf-8",
+            )
+        raise
+    raise SystemExit(exit_code)
