@@ -42,11 +42,12 @@ test -x "$flutter_bin_directory/flutter"
 test -x "$flutter_bin_directory/dart"
 export PATH="$flutter_bin_directory:$PATH"
 
-# Build/bootstrap helpers can generate files under app/. D2K's SecureStore
-# instrumentation must start from the canonical v0.9.22 source. Preserve the
-# bootstrap evidence/build products and generated iOS host project, restore the
-# exact candidate package, then put both generated trees back before D2K starts.
-# The canonical ZIP intentionally does not contain ios/.
+# Build/bootstrap helpers generate the Drift implementation under app/lib as
+# well as build/ and ios/. The canonical ZIP intentionally excludes generated
+# *.g.dart files and ios/, so preserve all three generated areas before restoring
+# the exact canonical source. Otherwise AppDatabase loses its generated base
+# implementation and flutter drive fails with missing transaction/customSelect/
+# customStatement methods before D2K can reach its trigger marker.
 candidate_zip="$ROOT/implementation-v0.9.22.zip"
 expected_candidate_sha="714b56ed1f074f22a500932719d75398ecfbc1c853da74e01eda85c4601fa6eb"
 if [[ ! -s "$candidate_zip" ]]; then
@@ -70,6 +71,25 @@ if [[ ! -f "$ROOT/app/ios/Runner.xcodeproj/project.pbxproj" ]]; then
   rm -rf "$preserve_root"
   exit 2
 fi
+
+mkdir -p "$preserve_root/generated_dart"
+while IFS= read -r generated_file; do
+  rel="${generated_file#"$ROOT/app/"}"
+  mkdir -p "$preserve_root/generated_dart/$(dirname "$rel")"
+  cp "$generated_file" "$preserve_root/generated_dart/$rel"
+done < <(find "$ROOT/app/lib" -type f -name '*.g.dart' -print)
+generated_dart_count="$(find "$preserve_root/generated_dart" -type f -name '*.g.dart' | wc -l | tr -d ' ')"
+if [[ "$generated_dart_count" -lt 1 ]]; then
+  echo "ERROR: D2K bootstrap generated no Dart *.g.dart files to preserve." >&2
+  rm -rf "$preserve_root"
+  exit 2
+fi
+if [[ ! -f "$preserve_root/generated_dart/lib/core/database/app_database.g.dart" ]]; then
+  echo "ERROR: D2K bootstrap AppDatabase generated implementation missing before source reset." >&2
+  rm -rf "$preserve_root"
+  exit 2
+fi
+
 mv "$ROOT/app/build" "$preserve_root/build"
 mv "$ROOT/app/ios" "$preserve_root/ios"
 if ! (
@@ -82,15 +102,21 @@ if ! (
   rm -rf "$ROOT/app/build" "$ROOT/app/ios"
   mv "$preserve_root/build" "$ROOT/app/build"
   mv "$preserve_root/ios" "$ROOT/app/ios"
+  cp -R "$preserve_root/generated_dart/." "$ROOT/app/"
   rm -rf "$preserve_root"
   exit 2
 fi
 mv "$preserve_root/build" "$ROOT/app/build"
 mv "$preserve_root/ios" "$ROOT/app/ios"
+cp -R "$preserve_root/generated_dart/." "$ROOT/app/"
 rm -rf "$preserve_root"
 
 if [[ ! -f "$ROOT/app/ios/Runner.xcodeproj/project.pbxproj" ]]; then
   echo "ERROR: D2K bootstrap-generated iOS host project was not restored after source reset." >&2
+  exit 2
+fi
+if [[ ! -f "$ROOT/app/lib/core/database/app_database.g.dart" ]]; then
+  echo "ERROR: D2K bootstrap AppDatabase generated implementation was not restored after source reset." >&2
   exit 2
 fi
 
@@ -123,9 +149,9 @@ if [[ "$source_reset_marker_count" != "1" ]]; then
   exit 2
 fi
 
-# app/build and the generated iOS host project were restored, so the pinned
-# Flutter record, D1 evidence, and an executable flutter-drive host project
-# remain available while Dart product source is canonical v0.9.22.
+# app/build, generated Dart, and the generated iOS host project were restored,
+# so the pinned Flutter record, D1 evidence, and an executable flutter-drive
+# source tree remain available while product source is canonical v0.9.22.
 flutter_result_file="$ROOT/app/build/task20_b_logs/ios/flutter_sdk_install.json"
 test -s "$flutter_result_file"
 
@@ -141,7 +167,10 @@ rm -rf "$wrapper_log_dir"/*
   echo "pubspec_lock_sha256=$(shasum -a 256 "$ROOT/app/pubspec.lock" | awk '{print $1}')"
   echo "secure_store_sha256=$(shasum -a 256 "$secure_store_file" | awk '{print $1}')"
   echo "secure_store_marker_count=$source_reset_marker_count"
+  echo "generated_dart_count=$generated_dart_count"
+  echo "app_database_g_sha256=$(shasum -a 256 "$ROOT/app/lib/core/database/app_database.g.dart" | awk '{print $1}')"
   echo "d2k_bootstrap_build_evidence_restored=true"
+  echo "d2k_bootstrap_generated_dart_restored=true"
   echo "d2k_bootstrap_generated_ios_restored=true"
   echo "ios_project_file=$ROOT/app/ios/Runner.xcodeproj/project.pbxproj"
   echo "ios_project_sha256=$(shasum -a 256 "$ROOT/app/ios/Runner.xcodeproj/project.pbxproj" | awk '{print $1}')"
@@ -177,6 +206,14 @@ is_retryable_trigger_startup_failure() {
   local log_file="$d2k_log_dir/trigger_flutter_drive.log"
   [[ -f "$log_file" ]] || return 1
   if grep -Fq 'D2K_READY_FOR_DB_LOCK' "$log_file"; then
+    return 1
+  fi
+  # A compile/package failure is deterministic for the current source and must
+  # never be mislabeled as a hosted-Simulator startup flake merely because
+  # flutter also prints "Application failed to start" afterward.
+  if grep -Eqi \
+    'Could not build the application|Target kernel_snapshot_program failed|Failed to package|Command PhaseScriptExecution failed|Error: The method .*isn.t defined' \
+    "$log_file"; then
     return 1
   fi
   grep -Eqi \
