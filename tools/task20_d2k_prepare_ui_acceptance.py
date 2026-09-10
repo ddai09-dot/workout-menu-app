@@ -7,13 +7,26 @@ import shutil
 import subprocess
 import sys
 import traceback
+import zipfile
 from pathlib import Path
+
+EXPECTED_CANDIDATE_SHA256 = "714b56ed1f074f22a500932719d75398ecfbc1c853da74e01eda85c4601fa6eb"
+EXPECTED_CANONICAL_SECURE_STORE_SHA256 = "33b463ca8f7cfd9e9e4cdf43ebb31f2e3cf8a517810dd835bfab1cfe0ec4881f"
+SECURE_STORE_MEMBER = "lib/core/security/secure_store.dart"
+
+
+def sha256_bytes(data: bytes) -> str:
+    return hashlib.sha256(data).hexdigest()
 
 
 def patch_secure_store_for_d2k(app_dir: Path) -> dict[str, object]:
-    secure_store = app_dir / "lib" / "core" / "security" / "secure_store.dart"
+    repo_root = Path(__file__).resolve().parents[1]
+    secure_store = app_dir / SECURE_STORE_MEMBER
     if not secure_store.is_file():
         raise SystemExit(f"secure_store.dart not found: {secure_store}")
+
+    evidence_dir = app_dir / "build" / "task20_d2k_reset_interruption"
+    evidence_dir.mkdir(parents=True, exist_ok=True)
 
     original = secure_store.read_text(encoding="utf-8")
     marker = """  @override
@@ -54,6 +67,65 @@ def patch_secure_store_for_d2k(app_dir: Path) -> dict[str, object]:
     marker_count = original.count(marker)
     replacement_count = original.count(replacement)
     already_instrumented = False
+    canonical_recovered = False
+    unexpected_sha256: str | None = None
+
+    if marker_count == 0 and replacement_count == 0:
+        # The outer lane has already authenticated the canonical v0.9.22 ZIP.
+        # Some preceding iOS acceptance helpers can leave an app-source overlay
+        # behind after their process exits. Recover only this test-overlaid file
+        # from that exact ZIP, preserve the unexpected source as evidence, and
+        # then apply the D2K-only instrumentation deterministically.
+        candidate_zip = repo_root / "implementation-v0.9.22.zip"
+        if not candidate_zip.is_file():
+            raise SystemExit(f"canonical v0.9.22 candidate ZIP not found: {candidate_zip}")
+        candidate_bytes = candidate_zip.read_bytes()
+        candidate_sha256 = sha256_bytes(candidate_bytes)
+        if candidate_sha256 != EXPECTED_CANDIDATE_SHA256:
+            raise SystemExit(
+                "D2K canonical candidate ZIP SHA mismatch during SecureStore recovery: "
+                f"{candidate_sha256}"
+            )
+        with zipfile.ZipFile(candidate_zip) as archive:
+            canonical_bytes = archive.read(SECURE_STORE_MEMBER)
+        canonical_sha256 = sha256_bytes(canonical_bytes)
+        if canonical_sha256 != EXPECTED_CANONICAL_SECURE_STORE_SHA256:
+            raise SystemExit(
+                "D2K canonical SecureStore SHA mismatch during recovery: "
+                f"{canonical_sha256}"
+            )
+        canonical_text = canonical_bytes.decode("utf-8")
+        if canonical_text.count(marker) != 1 or canonical_text.count(replacement) != 0:
+            raise SystemExit("D2K canonical SecureStore marker contract mismatch during recovery")
+
+        unexpected_bytes = original.encode("utf-8")
+        unexpected_sha256 = sha256_bytes(unexpected_bytes)
+        (evidence_dir / "secure_store_preinstrumentation_unexpected.dart").write_bytes(
+            unexpected_bytes
+        )
+        (evidence_dir / "secure_store_recovery.json").write_text(
+            json.dumps(
+                {
+                    "status": "RECOVERED",
+                    "unexpected_sha256": unexpected_sha256,
+                    "unexpected_marker_count": marker_count,
+                    "unexpected_instrumented_count": replacement_count,
+                    "candidate_zip_sha256": candidate_sha256,
+                    "canonical_secure_store_sha256": canonical_sha256,
+                    "product_zip_changed": False,
+                },
+                ensure_ascii=False,
+                indent=2,
+                sort_keys=True,
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+        secure_store.write_bytes(canonical_bytes)
+        original = canonical_text
+        marker_count = 1
+        replacement_count = 0
+        canonical_recovered = True
 
     if marker_count == 1 and replacement_count == 0:
         canonical = original
@@ -78,6 +150,8 @@ def patch_secure_store_for_d2k(app_dir: Path) -> dict[str, object]:
         "original_sha256": hashlib.sha256(canonical.encode()).hexdigest(),
         "instrumented_sha256": hashlib.sha256(patched.encode()).hexdigest(),
         "already_instrumented": already_instrumented,
+        "canonical_recovered": canonical_recovered,
+        "unexpected_sha256": unexpected_sha256,
         "dart_define": "TASK20_D2K_TEST_GATE=true",
         "gate_key": "task20_d2k_gate_armed",
         "waiting_marker": "D2K_SECURE_KEY_SWITCHED_WAITING_FOR_HOST",
