@@ -8,7 +8,7 @@ fi
 
 UDID="$1"
 EVIDENCE_DIR="$2"
-TARGET_CATEGORY="accessibility-extra-large"
+TARGET_CATEGORY="${TASK20_D2J_CONTENT_SIZE:-accessibility-extra-large}"
 mkdir -p "$EVIDENCE_DIR"
 
 xcrun simctl help ui > "$EVIDENCE_DIR/simctl_ui_help.txt" 2>&1
