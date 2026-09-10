@@ -4,15 +4,37 @@ set -Eeuo pipefail
 ROOT="${GITHUB_WORKSPACE:-$(pwd)}"
 cd "$ROOT"
 
-# Keep the already accepted v0.9.22 D2J regression lane intact, then add the
-# D2-08 local-reset interruption acceptance on the same exact candidate.
-bash tools/run_task20_d2j_v0922_current_head_ios_ci.sh
+# D2J Dynamic Type and ZIP acceptance run in separate exact-head workflows.
+# D2K only needs the canonical v0.9.22 candidate, pinned Flutter toolchain,
+# generated iOS host, and D1-selected Simulator. Do not rerun unrelated D2H,
+# D2I, D2G, D2F, D2E, D2A, D2C, or D2D lanes here: a hosted-Simulator flake
+# in one of those already-covered lanes must not prevent D2K from executing.
+bash tools/task20_d2j_build_current_v0922.sh
 
-# The D2J runner installs the pinned Flutter SDK and exports PATH only inside
-# its child shell. Restore that exact SDK path in this parent shell before D2K.
+result_file="$ROOT/app/build/task20_b_logs/ios/flutter_sdk_install.json"
+mkdir -p "$(dirname "$result_file")"
+python3 app/tools/install_pinned_flutter_sdk.py \
+  --version 3.44.6 \
+  --channel stable \
+  --ref-prefix ee80f08 \
+  --install-root "${RUNNER_TOOL_CACHE}/workout-menu-flutter" \
+  --result-file "$result_file"
+flutter_bin_directory="$(python3 -c 'import json,sys; from pathlib import Path; print(Path(json.load(open(sys.argv[1], encoding="utf-8"))["flutter_bin"]).parent)' "$result_file")"
+test -x "$flutter_bin_directory/flutter"
+test -x "$flutter_bin_directory/dart"
+export PATH="$flutter_bin_directory:$PATH"
+
+bash tools/run_task20_with_v0922_lock_shim.sh \
+  "$ROOT/app" \
+  bash "$ROOT/app/tools/run_task20_b_ios_simulator.sh"
+
+TASK20_D1_LOG_DIR="$ROOT/app/build/task20_d1_ios_launch_smoke" \
+  bash tools/task20_d1_ios_launch_smoke.sh "$ROOT/app/build/ios/iphonesimulator/Runner.app"
+
+# Reconfirm the exact pinned SDK path produced by the minimal D2K bootstrap.
 flutter_result_file="$ROOT/app/build/task20_b_logs/ios/flutter_sdk_install.json"
 if [[ ! -s "$flutter_result_file" ]]; then
-  echo "ERROR: Flutter SDK install result missing after D2J: $flutter_result_file" >&2
+  echo "ERROR: Flutter SDK install result missing after D2K bootstrap: $flutter_result_file" >&2
   exit 2
 fi
 flutter_bin_directory="$(python3 -c 'import json,sys; from pathlib import Path; print(Path(json.load(open(sys.argv[1], encoding="utf-8"))["flutter_bin"]).parent)' "$flutter_result_file")"
@@ -20,16 +42,15 @@ test -x "$flutter_bin_directory/flutter"
 test -x "$flutter_bin_directory/dart"
 export PATH="$flutter_bin_directory:$PATH"
 
-# D2A..D2J acceptance helpers intentionally overlay files under app/. D2K's
-# SecureStore instrumentation must start from the canonical v0.9.22 source,
-# otherwise a previous lane can invalidate its exact source precondition.
-# Preserve all prior CI evidence/build products and the D2J-generated iOS host
-# project, restore the exact candidate package, then put both generated trees
-# back before D2K starts. The canonical ZIP intentionally does not contain ios/.
+# Build/bootstrap helpers can generate files under app/. D2K's SecureStore
+# instrumentation must start from the canonical v0.9.22 source. Preserve the
+# bootstrap evidence/build products and generated iOS host project, restore the
+# exact candidate package, then put both generated trees back before D2K starts.
+# The canonical ZIP intentionally does not contain ios/.
 candidate_zip="$ROOT/implementation-v0.9.22.zip"
 expected_candidate_sha="714b56ed1f074f22a500932719d75398ecfbc1c853da74e01eda85c4601fa6eb"
 if [[ ! -s "$candidate_zip" ]]; then
-  echo "ERROR: canonical v0.9.22 candidate ZIP missing after D2J: $candidate_zip" >&2
+  echo "ERROR: canonical v0.9.22 candidate ZIP missing after D2K bootstrap: $candidate_zip" >&2
   exit 2
 fi
 actual_candidate_sha="$(shasum -a 256 "$candidate_zip" | awk '{print $1}')"
@@ -40,12 +61,12 @@ fi
 
 preserve_root="$(mktemp -d "$ROOT/.task20-d2k-preserve.XXXXXX")"
 if [[ ! -d "$ROOT/app/build" ]]; then
-  echo "ERROR: D2J build/evidence tree missing before D2K source reset." >&2
+  echo "ERROR: D2K bootstrap build/evidence tree missing before source reset." >&2
   rm -rf "$preserve_root"
   exit 2
 fi
 if [[ ! -f "$ROOT/app/ios/Runner.xcodeproj/project.pbxproj" ]]; then
-  echo "ERROR: D2J-generated iOS host project missing before D2K source reset." >&2
+  echo "ERROR: D2K bootstrap-generated iOS host project missing before source reset." >&2
   rm -rf "$preserve_root"
   exit 2
 fi
@@ -69,7 +90,7 @@ mv "$preserve_root/ios" "$ROOT/app/ios"
 rm -rf "$preserve_root"
 
 if [[ ! -f "$ROOT/app/ios/Runner.xcodeproj/project.pbxproj" ]]; then
-  echo "ERROR: D2J-generated iOS host project was not restored after D2K source reset." >&2
+  echo "ERROR: D2K bootstrap-generated iOS host project was not restored after source reset." >&2
   exit 2
 fi
 
@@ -103,8 +124,8 @@ if [[ "$source_reset_marker_count" != "1" ]]; then
 fi
 
 # app/build and the generated iOS host project were restored, so the pinned
-# Flutter record, accepted D2J evidence, and an executable flutter-drive host
-# project remain available while Dart product source is canonical v0.9.22.
+# Flutter record, D1 evidence, and an executable flutter-drive host project
+# remain available while Dart product source is canonical v0.9.22.
 flutter_result_file="$ROOT/app/build/task20_b_logs/ios/flutter_sdk_install.json"
 test -s "$flutter_result_file"
 
@@ -120,8 +141,8 @@ rm -rf "$wrapper_log_dir"/*
   echo "pubspec_lock_sha256=$(shasum -a 256 "$ROOT/app/pubspec.lock" | awk '{print $1}')"
   echo "secure_store_sha256=$(shasum -a 256 "$secure_store_file" | awk '{print $1}')"
   echo "secure_store_marker_count=$source_reset_marker_count"
-  echo "d2j_build_evidence_restored=true"
-  echo "d2j_generated_ios_restored=true"
+  echo "d2k_bootstrap_build_evidence_restored=true"
+  echo "d2k_bootstrap_generated_ios_restored=true"
   echo "ios_project_file=$ROOT/app/ios/Runner.xcodeproj/project.pbxproj"
   echo "ios_project_sha256=$(shasum -a 256 "$ROOT/app/ios/Runner.xcodeproj/project.pbxproj" | awk '{print $1}')"
 } > "$wrapper_log_dir/source_reset_preflight.log"
