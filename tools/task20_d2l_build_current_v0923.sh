@@ -86,9 +86,19 @@ with tempfile.TemporaryDirectory(prefix="task20-d2l-v0923-") as temp_dir:
     for rel in [
         "tools/verify_project_consistency.py",
         "tools/verify_task20_b_execution_lane.py",
-        "docs/weekly_algorithm_traceability_verification.json",
     ]:
         replace_once(root / rel, "0.9.22+40", "0.9.23+41")
+
+    trace_json = root / "docs/weekly_algorithm_traceability_verification.json"
+    trace_json_text = trace_json.read_text(encoding="utf-8")
+    if trace_json_text.count("0.9.22+40") != 2:
+        raise SystemExit(
+            "expected exactly two v0.9.22 markers in weekly algorithm trace JSON"
+        )
+    trace_json.write_text(
+        trace_json_text.replace("0.9.22+40", "0.9.23+41"),
+        encoding="utf-8",
+    )
 
     trace = root / "tools/verify_weekly_algorithm_traceability.py"
     trace_text = trace.read_text(encoding="utf-8")
