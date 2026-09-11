@@ -1,0 +1,160 @@
+name: Task 20-D2L iOS Dynamic Type Matrix
+
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: task20-d2l-ios-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  ios-dynamic-type-matrix:
+    name: Dynamic Type / ${{ matrix.content_size }}
+    runs-on: macos-15
+    timeout-minutes: 300
+    strategy:
+      fail-fast: false
+      max-parallel: 4
+      matrix:
+        content_size:
+          - extra-small
+          - small
+          - medium
+          - large
+          - extra-large
+          - extra-extra-large
+          - extra-extra-extra-large
+          - accessibility-medium
+          - accessibility-large
+          - accessibility-extra-large
+          - accessibility-extra-extra-large
+          - accessibility-extra-extra-extra-large
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+
+      - name: Rebuild and verify canonical v0.9.23
+        shell: bash
+        run: bash tools/task20_d2l_build_current_v0923.sh
+
+      - name: Install pinned Flutter SDK from official archive
+        id: flutter-sdk
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          result_file="app/build/task20_b_logs/ios/flutter_sdk_install.json"
+          mkdir -p "$(dirname "$result_file")"
+          python3 app/tools/install_pinned_flutter_sdk.py \
+            --version 3.44.6 \
+            --channel stable \
+            --ref-prefix ee80f08 \
+            --install-root "${RUNNER_TOOL_CACHE}/workout-menu-flutter" \
+            --result-file "$result_file" \
+            --github-output "$GITHUB_OUTPUT"
+          flutter_bin_directory="$(python3 -c 'import json,sys; from pathlib import Path; print(Path(json.load(open(sys.argv[1], encoding="utf-8"))["flutter_bin"]).parent)' "$result_file")"
+          test -x "$flutter_bin_directory/flutter"
+          echo "$flutter_bin_directory" >> "$GITHUB_PATH"
+
+      - name: Run Task 20-B iOS Simulator checks
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          bash tools/run_task20_with_v0923_lock_shim.sh \
+            "$GITHUB_WORKSPACE/app" \
+            bash "$GITHUB_WORKSPACE/app/tools/run_task20_b_ios_simulator.sh"
+
+      - name: Run Task 20-D1 iOS launch smoke
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          TASK20_D1_LOG_DIR="$GITHUB_WORKSPACE/app/build/task20_d1_ios_launch_smoke" \
+            bash tools/task20_d1_ios_launch_smoke.sh \
+            "$GITHUB_WORKSPACE/app/build/ios/iphonesimulator/Runner.app"
+
+      - name: Run full-flow Dynamic Type acceptance
+        shell: bash
+        env:
+          TASK20_D2J_CONTENT_SIZE: ${{ matrix.content_size }}
+        run: |
+          set -Eeuo pipefail
+          pin_active=false
+          restore_pin() {
+            if [[ "$pin_active" == true ]]; then
+              python3 tools/task20_c4_transient_pin.py restore "$GITHUB_WORKSPACE/app/pubspec.yaml"
+              pin_active=false
+            fi
+          }
+          python3 tools/task20_c4_transient_pin.py pin "$GITHUB_WORKSPACE/app/pubspec.yaml"
+          pin_active=true
+          trap restore_pin EXIT
+          TASK20_D2J_DRIVE_TIMEOUT_SECONDS=1800 \
+          TASK20_D2J_LOG_DIR="$GITHUB_WORKSPACE/app/build/task20_d2l_dynamic_type/${TASK20_D2J_CONTENT_SIZE}" \
+            bash tools/run_task20_d2j_dynamic_type_acceptance_warm_retry.sh \
+            "$GITHUB_WORKSPACE/app"
+          restore_pin
+          trap - EXIT
+
+      - name: Verify requested Dynamic Type category
+        shell: bash
+        env:
+          TASK20_D2J_CONTENT_SIZE: ${{ matrix.content_size }}
+        run: |
+          set -Eeuo pipefail
+          result="$GITHUB_WORKSPACE/app/build/task20_d2l_dynamic_type/${TASK20_D2J_CONTENT_SIZE}/result.json"
+          test -s "$result"
+          python3 - "$result" "$TASK20_D2J_CONTENT_SIZE" <<'PY'
+          import json
+          import sys
+          from pathlib import Path
+
+          result = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
+          expected = sys.argv[2]
+          if result.get("status") != "PASS":
+              raise SystemExit(f"Dynamic Type acceptance did not PASS: {result}")
+          actual = result.get("content_size_category") or result.get("target_content_size")
+          if actual != expected:
+              raise SystemExit(f"content size mismatch: expected={expected} actual={actual}")
+          print(f"Dynamic Type {expected}: PASS")
+          PY
+
+      - name: Verify Task 20-C3 clean analyzer gate
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          python3 tools/task20_c3_verify_analyzer_clean.py \
+            app/build/task20_b_logs/ios/flutter_checks/flutter_analyze.log \
+            app/tools/run_task20_b_flutter_checks.sh
+
+      - name: Verify Task 20-C4 dependency resolution
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          python3 tools/task20_c4_verify_dependency_resolution.py \
+            app/pubspec.yaml app/pubspec.lock
+
+      - name: Upload Task 20-D2L evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: task20-d2l-${{ matrix.content_size }}-${{ github.run_id }}-attempt-${{ github.run_attempt }}
+          path: |
+            implementation-v0.9.22.zip
+            implementation-v0.9.23.zip
+            app/build/task20_b_logs/ios
+            app/build/task20_d1_ios_launch_smoke
+            app/build/task20_d2l_dynamic_type
+            app/pubspec.yaml
+            app/pubspec.lock
+            app/lib/**/*.g.dart
+            app/ios
+            app/build/ios/iphonesimulator/Runner.app
+          if-no-files-found: warn
+          retention-days: 14

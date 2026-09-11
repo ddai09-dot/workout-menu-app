@@ -105,7 +105,7 @@ void main() {
       await _scrollUntilTextVisible(tester, '端末内データ');
       await _tapText(tester, '端末内データ');
       await _waitForText(tester, '端末内データを初期化');
-      await _waitForText(tester, '削除されるもの');
+      await _scrollUntilTextVisible(tester, '削除されるもの');
       await _scrollUntilTextVisible(tester, '削除されないもの');
       expect(find.text('削除されないもの'), findsOneWidget);
       await _scrollUntilTextVisible(
@@ -277,8 +277,6 @@ Future<void> _chooseFirstPickerValue(
     await tester.pump(const Duration(milliseconds: 250));
     if (labelCandidates.evaluate().isNotEmpty) {
       final labelFinder = labelCandidates.first;
-      await tester.ensureVisible(labelFinder);
-      await tester.pump(const Duration(milliseconds: 250));
       final pickerField = find
           .ancestor(of: labelFinder, matching: find.byType(Column))
           .first;
@@ -287,7 +285,14 @@ Future<void> _chooseFirstPickerValue(
         matching: find.text('選択してください'),
       );
       expect(placeholder, findsOneWidget);
-      await tester.tap(placeholder);
+      final pickerTapTarget = find.ancestor(
+        of: placeholder,
+        matching: find.byType(InkWell),
+      );
+      expect(pickerTapTarget, findsOneWidget);
+      await tester.ensureVisible(pickerTapTarget.first);
+      await tester.pump(const Duration(milliseconds: 250));
+      await tester.tap(pickerTapTarget.first);
       await tester.pump(const Duration(milliseconds: 500));
       expect(find.byType(CupertinoPicker), findsOneWidget);
       await _tapText(tester, 'この数値を使う');
