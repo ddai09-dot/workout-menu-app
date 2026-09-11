@@ -20,7 +20,7 @@ import zipfile
 from pathlib import Path
 
 PARENT_ZIP_SHA = "714b56ed1f074f22a500932719d75398ecfbc1c853da74e01eda85c4601fa6eb"
-EXPECTED_ZIP_SHA = "35858d4651c19743f2753b5f1d62977547073bcf8f88a16396827f50a84ab2f9"
+EXPECTED_ZIP_SHA = "0ee2baff7fab5f02dde3dc73acb7b22f61b752805d6fc41369cf5c7ae684f2ea"
 EXPECTED_PUBSPEC_SHA = "243a2ad8e6d3afd291046523a23a8d87b32f7683b8217d8d139c68a7183a2c28"
 EXPECTED = {
     "runtime": "827084034654c36a8a930b8f234d97a17367de2a4b79cf82028edfad8fdde36f",
@@ -252,5 +252,5 @@ python3 app/tools/verify_project_consistency.py
 python3 app/tools/verify_weekly_algorithm_traceability.py
 python3 app/tools/verify_task20_b_execution_lane.py
 test "$(shasum -a 256 implementation-v0.9.22.zip | awk '{print $1}')" = "714b56ed1f074f22a500932719d75398ecfbc1c853da74e01eda85c4601fa6eb"
-test "$(shasum -a 256 implementation-v0.9.23.zip | awk '{print $1}')" = "35858d4651c19743f2753b5f1d62977547073bcf8f88a16396827f50a84ab2f9"
+test "$(shasum -a 256 implementation-v0.9.23.zip | awk '{print $1}')" = "0ee2baff7fab5f02dde3dc73acb7b22f61b752805d6fc41369cf5c7ae684f2ea"
 python3 tools/task20_restore_v0923_ci_lock.py "$ROOT/app"
