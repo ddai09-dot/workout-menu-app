@@ -41,9 +41,9 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Rebuild and verify canonical v0.9.22
+      - name: Rebuild and verify canonical v0.9.23
         shell: bash
-        run: bash tools/task20_d2j_build_current_v0922.sh
+        run: bash tools/task20_d2l_build_current_v0923.sh
 
       - name: Install pinned Flutter SDK from official archive
         id: flutter-sdk
@@ -67,7 +67,7 @@ jobs:
         shell: bash
         run: |
           set -Eeuo pipefail
-          bash tools/run_task20_with_v0922_lock_shim.sh \
+          bash tools/run_task20_with_v0923_lock_shim.sh \
             "$GITHUB_WORKSPACE/app" \
             bash "$GITHUB_WORKSPACE/app/tools/run_task20_b_ios_simulator.sh"
 
@@ -147,6 +147,7 @@ jobs:
           name: task20-d2l-${{ matrix.content_size }}-${{ github.run_id }}-attempt-${{ github.run_attempt }}
           path: |
             implementation-v0.9.22.zip
+            implementation-v0.9.23.zip
             app/build/task20_b_logs/ios
             app/build/task20_d1_ios_launch_smoke
             app/build/task20_d2l_dynamic_type
