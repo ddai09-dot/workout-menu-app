@@ -25,6 +25,11 @@ if [[ -e "$LOCK_PATH" ]]; then
   exit 2
 fi
 
+# zip extraction on hosted macOS does not reliably preserve executable bits for
+# the canonical shell harness. Restore only filesystem mode bits after all
+# package/hash verification; product bytes remain unchanged.
+find "$APP_DIR/tools" -type f -name '*.sh' -exec chmod +x {} +
+
 REAL_FLUTTER="$(command -v flutter || true)"
 if [[ -z "$REAL_FLUTTER" || ! -x "$REAL_FLUTTER" ]]; then
   echo "ERROR: real flutter executable was not found before lock shim setup." >&2
