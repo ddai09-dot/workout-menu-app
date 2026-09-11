@@ -102,9 +102,9 @@ with tempfile.TemporaryDirectory(prefix="task20-d2l-v0923-") as temp_dir:
 
     trace = root / "tools/verify_weekly_algorithm_traceability.py"
     trace_text = trace.read_text(encoding="utf-8")
-    if trace_text.count("0.9.22+40") != 2:
+    if trace_text.count("0.9.22+40") != 3:
         raise SystemExit(
-            "expected exactly two v0.9.22 markers in weekly algorithm trace verifier"
+            "expected exactly three v0.9.22 markers in weekly algorithm trace verifier"
         )
     trace.write_text(
         trace_text.replace("0.9.22+40", "0.9.23+41"),
