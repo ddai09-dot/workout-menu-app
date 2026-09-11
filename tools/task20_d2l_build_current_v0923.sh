@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import shutil
 import stat
 import subprocess
 import sys
@@ -85,10 +86,20 @@ with tempfile.TemporaryDirectory(prefix="task20-d2l-v0923-") as temp_dir:
     for rel in [
         "tools/verify_project_consistency.py",
         "tools/verify_task20_b_execution_lane.py",
-        "tools/verify_weekly_algorithm_traceability.py",
         "docs/weekly_algorithm_traceability_verification.json",
     ]:
         replace_once(root / rel, "0.9.22+40", "0.9.23+41")
+
+    trace = root / "tools/verify_weekly_algorithm_traceability.py"
+    trace_text = trace.read_text(encoding="utf-8")
+    if trace_text.count("0.9.22+40") != 2:
+        raise SystemExit(
+            "expected exactly two v0.9.22 markers in weekly algorithm trace verifier"
+        )
+    trace.write_text(
+        trace_text.replace("0.9.22+40", "0.9.23+41"),
+        encoding="utf-8",
+    )
 
     replace_once(
         root / "tools/verify_project_consistency.py",
@@ -139,6 +150,7 @@ with tempfile.TemporaryDirectory(prefix="task20-d2l-v0923-") as temp_dir:
         encoding="utf-8",
     )
 
+    # Regenerate the traceability JSON using the updated verifier before hashing.
     for command in [
         [sys.executable, "tools/verify_project_consistency.py"],
         [sys.executable, "tools/verify_weekly_algorithm_traceability.py"],
