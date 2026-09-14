@@ -102,6 +102,80 @@ def main() -> int:
 }
 """
     support_text = support_text[:start] + helper + support_text[end:]
+
+    # At accessibility-extra-extra-extra-large, ensureVisible can leave a
+    # SegmentedButton label underneath the persistent bottom NavigationBar.
+    # A plain tester.tap(label) then lands on the navigation control and the
+    # following lazily-built selector never appears. Only tap a hit-testable
+    # label; if it is obscured, scroll the owning page forward until the real
+    # segment is exposed. Also keep scanning when the requested selector itself
+    # has not been materialized yet.
+    segment_start_marker = "Future<void> selectSegmentValue(\n"
+    segment_end_marker = "\nvoid expectSegmentValue(\n"
+    if (
+        support_text.count(segment_start_marker) != 1
+        or support_text.count(segment_end_marker) != 1
+    ):
+        raise SystemExit("expected exactly one D2D segmented selector helper")
+    segment_start = support_text.index(segment_start_marker)
+    segment_end = support_text.index(segment_end_marker, segment_start)
+    segment_helper = """Future<void> selectSegmentValue(
+  WidgetTester tester, {
+  required int selectorIndex,
+  required int value,
+}) async {
+  final selectors = find.byType(SegmentedButton<int>);
+  final deadline = DateTime.now().add(const Duration(seconds: 30));
+  while (DateTime.now().isBefore(deadline)) {
+    await tester.pump(const Duration(milliseconds: 250));
+    if (selectors.evaluate().length > selectorIndex) {
+      final selector = selectors.at(selectorIndex);
+      final valueFinder = find.descendant(
+        of: selector,
+        matching: find.text('$value'),
+      );
+      expect(valueFinder, findsOneWidget);
+      await tester.ensureVisible(valueFinder);
+      await tester.pump(const Duration(milliseconds: 250));
+
+      var tappableValue = valueFinder.hitTestable();
+      for (
+        var attempt = 0;
+        attempt < 6 && tappableValue.evaluate().isEmpty;
+        attempt++
+      ) {
+        final scrolled = await _scrollPrimaryVerticalScrollableForward(
+          tester,
+          delta: 160,
+        );
+        if (!scrolled) {
+          break;
+        }
+        await tester.pump(const Duration(milliseconds: 300));
+        tappableValue = valueFinder.hitTestable();
+      }
+      if (tappableValue.evaluate().isEmpty) {
+        throw TestFailure(
+          'Segmented selector $selectorIndex value $value remained obscured.',
+        );
+      }
+      await tester.tap(tappableValue.first);
+      await tester.pump(const Duration(milliseconds: 500));
+      await waitForWeeklySavingToFinish(tester);
+      return;
+    }
+    await _scrollPrimaryVerticalScrollableForward(tester, delta: 160);
+  }
+  throw TestFailure(
+    'Timed out waiting for segmented selector $selectorIndex value $value',
+  );
+}
+"""
+    support_text = (
+        support_text[:segment_start]
+        + segment_helper
+        + support_text[segment_end:]
+    )
     support.write_text(support_text, encoding="utf-8")
 
     verified = support.read_text(encoding="utf-8")
@@ -109,6 +183,10 @@ def main() -> int:
         raise SystemExit("D2D picker overlay still taps obscurable placeholder text")
     if verified.count("await tester.tap(pickerTapTarget.first);") != 1:
         raise SystemExit("D2D picker overlay did not install the InkWell tap target")
+    if verified.count("var tappableValue = valueFinder.hitTestable();") != 1:
+        raise SystemExit("D2D segmented overlay did not install hit-test gating")
+    if verified.count("await tester.tap(tappableValue.first);") != 1:
+        raise SystemExit("D2D segmented overlay did not install the reachable tap target")
 
     print(f"Prepared Task 20-D2D test overlay in {app_dir}")
     return 0
