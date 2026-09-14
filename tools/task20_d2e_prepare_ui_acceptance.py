@@ -73,13 +73,26 @@ def main() -> int:
     # readiness loop only searched the current element tree, so it timed out
     # while showing a healthy "開始前の確認" screen. Scroll the visible ListView
     # forward while waiting so the pain card and CTAs can be built and found.
+    #
+    # Newer raw overlay sources already contain this hardening. Keep this
+    # preparer idempotent so D2E can safely consume either the historical raw
+    # source or the already-hardened source without applying the patch twice.
     flow = app_dir / "integration_test" / "task20_d2e_workout_core_flow_test.dart"
     flow_text = flow.read_text(encoding="utf-8")
     old = """    if (find.text(errorText).evaluate().isNotEmpty) {\n      await binding.takeScreenshot('D2E_DIAG_start_load_error');\n      throw TestFailure(\n        'Workout start summary returned the visible load-error state: $errorText',\n      );\n    }\n  }\n\n  await binding.takeScreenshot('D2E_DIAG_start_load_timeout');\n"""
     new = """    if (find.text(errorText).evaluate().isNotEmpty) {\n      await binding.takeScreenshot('D2E_DIAG_start_load_error');\n      throw TestFailure(\n        'Workout start summary returned the visible load-error state: $errorText',\n      );\n    }\n    final scrollables = find.byType(Scrollable).hitTestable();\n    if (scrollables.evaluate().isNotEmpty) {\n      await tester.drag(scrollables.first, const Offset(0, -220));\n      await tester.pump(const Duration(milliseconds: 300));\n    }\n  }\n\n  await binding.takeScreenshot('D2E_DIAG_start_load_timeout');\n"""
-    if flow_text.count(old) != 1:
-        raise SystemExit("expected exactly one D2E workout-start readiness loop")
-    flow.write_text(flow_text.replace(old, new, 1), encoding="utf-8")
+    installed_marker = "await tester.drag(scrollables.first, const Offset(0, -220));"
+    old_count = flow_text.count(old)
+    installed_count = flow_text.count(installed_marker)
+    if old_count == 1 and installed_count == 0:
+        flow.write_text(flow_text.replace(old, new, 1), encoding="utf-8")
+    elif old_count == 0 and installed_count == 1:
+        pass
+    else:
+        raise SystemExit(
+            "unexpected D2E workout-start readiness state: "
+            f"old={old_count}, installed={installed_count}"
+        )
 
     d2d_support = app_dir / "integration_test" / "task20_d2d_test_support.dart"
     d2d_text = d2d_support.read_text(encoding="utf-8")
@@ -89,7 +102,7 @@ def main() -> int:
         raise SystemExit("D2E preparation lost the D2D InkWell picker target")
 
     verified_flow = flow.read_text(encoding="utf-8")
-    if verified_flow.count("await tester.drag(scrollables.first, const Offset(0, -220));") != 1:
+    if verified_flow.count(installed_marker) != 1:
         raise SystemExit("D2E enlarged-text readiness scroll was not installed")
 
     print(f"Prepared Task 20-D2E test overlay in {app_dir}")
