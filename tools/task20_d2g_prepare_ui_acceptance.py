@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import shutil
+import subprocess
 import sys
 from pathlib import Path
 
@@ -112,12 +113,28 @@ def main() -> int:
     if not pubspec.is_file():
         raise SystemExit(f"pubspec.yaml not found: {pubspec}")
 
+    # D2G also depends on the shared D2D onboarding helper. Re-run the D2D
+    # preparer instead of raw-copying task20_d2d_test_support.dart, otherwise
+    # this later preparer would undo the maximum-Dynamic-Type InkWell picker
+    # normalization installed by D2D/D2E.
+    d2d_prepare = repo_root / "tools" / "task20_d2d_prepare_ui_acceptance.py"
+    completed = subprocess.run(
+        [sys.executable, str(d2d_prepare), str(app_dir)],
+        text=True,
+        capture_output=True,
+    )
+    if completed.returncode != 0:
+        raise SystemExit(
+            "D2G could not prepare its D2D dependency:\n"
+            f"{completed.stdout}{completed.stderr}"
+        )
+    if completed.stdout:
+        print(completed.stdout, end="")
+
     test_destination = (
         app_dir / "integration_test" / "task20_d2g_my_page_settings_test.dart"
     )
     source_files = {
-        repo_root / "tools" / "task20_d2d_test_support.dart":
-            app_dir / "integration_test" / "task20_d2d_test_support.dart",
         repo_root / "tools" / "task20_d2e_test_support.dart":
             app_dir / "integration_test" / "task20_d2e_test_support.dart",
         repo_root / "tools" / "task20_d2g_test_support.dart":
@@ -153,6 +170,13 @@ def main() -> int:
         destination.parent.mkdir(parents=True, exist_ok=True)
         shutil.copyfile(source, destination)
     patch_ui_acceptance(test_destination)
+
+    d2d_support = app_dir / "integration_test" / "task20_d2d_test_support.dart"
+    d2d_text = d2d_support.read_text(encoding="utf-8")
+    if "await tester.tap(placeholder);" in d2d_text:
+        raise SystemExit("D2G preparation restored the obsolete D2D placeholder tap")
+    if d2d_text.count("await tester.tap(pickerTapTarget.first);") != 1:
+        raise SystemExit("D2G preparation lost the D2D InkWell picker target")
 
     print(f"Prepared Task 20-D2G test-only overlay in {app_dir}")
     return 0
