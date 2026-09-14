@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 from __future__ import annotations
 
-import shutil
+import subprocess
 import sys
 from pathlib import Path
 
@@ -16,9 +16,25 @@ def main() -> int:
     if not pubspec.is_file():
         raise SystemExit(f"pubspec.yaml not found: {pubspec}")
 
+    # D2E depends on the D2D onboarding helper. Re-run the D2D preparer here
+    # instead of copying its raw source directly: the D2D preparer normalizes
+    # the picker interaction to the reachable InkWell target for the maximum
+    # Dynamic Type category. This also makes standalone D2E preparation safe.
+    d2d_prepare = repo_root / "tools" / "task20_d2d_prepare_ui_acceptance.py"
+    completed = subprocess.run(
+        [sys.executable, str(d2d_prepare), str(app_dir)],
+        text=True,
+        capture_output=True,
+    )
+    if completed.returncode != 0:
+        raise SystemExit(
+            "D2E could not prepare its D2D dependency:\n"
+            f"{completed.stdout}{completed.stderr}"
+        )
+    if completed.stdout:
+        print(completed.stdout, end="")
+
     source_files = {
-        repo_root / "tools" / "task20_d2d_test_support.dart":
-            app_dir / "integration_test" / "task20_d2d_test_support.dart",
         repo_root / "tools" / "task20_d2e_test_support.dart":
             app_dir / "integration_test" / "task20_d2e_test_support.dart",
         repo_root / "tools" / "task20_d2e_workout_core_flow_test.dart":
@@ -50,7 +66,31 @@ def main() -> int:
 
     for source, destination in source_files.items():
         destination.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copyfile(source, destination)
+        destination.write_bytes(source.read_bytes())
+
+    # At accessibility-extra-extra-large the launch summary is valid but the
+    # lower cards are not materialized by ListView until it scrolls. The old
+    # readiness loop only searched the current element tree, so it timed out
+    # while showing a healthy "開始前の確認" screen. Scroll the visible ListView
+    # forward while waiting so the pain card and CTAs can be built and found.
+    flow = app_dir / "integration_test" / "task20_d2e_workout_core_flow_test.dart"
+    flow_text = flow.read_text(encoding="utf-8")
+    old = """    if (find.text(errorText).evaluate().isNotEmpty) {\n      await binding.takeScreenshot('D2E_DIAG_start_load_error');\n      throw TestFailure(\n        'Workout start summary returned the visible load-error state: $errorText',\n      );\n    }\n  }\n\n  await binding.takeScreenshot('D2E_DIAG_start_load_timeout');\n"""
+    new = """    if (find.text(errorText).evaluate().isNotEmpty) {\n      await binding.takeScreenshot('D2E_DIAG_start_load_error');\n      throw TestFailure(\n        'Workout start summary returned the visible load-error state: $errorText',\n      );\n    }\n    final scrollables = find.byType(Scrollable).hitTestable();\n    if (scrollables.evaluate().isNotEmpty) {\n      await tester.drag(scrollables.first, const Offset(0, -220));\n      await tester.pump(const Duration(milliseconds: 300));\n    }\n  }\n\n  await binding.takeScreenshot('D2E_DIAG_start_load_timeout');\n"""
+    if flow_text.count(old) != 1:
+        raise SystemExit("expected exactly one D2E workout-start readiness loop")
+    flow.write_text(flow_text.replace(old, new, 1), encoding="utf-8")
+
+    d2d_support = app_dir / "integration_test" / "task20_d2d_test_support.dart"
+    d2d_text = d2d_support.read_text(encoding="utf-8")
+    if "await tester.tap(placeholder);" in d2d_text:
+        raise SystemExit("D2E preparation restored the obsolete D2D placeholder tap")
+    if d2d_text.count("await tester.tap(pickerTapTarget.first);") != 1:
+        raise SystemExit("D2E preparation lost the D2D InkWell picker target")
+
+    verified_flow = flow.read_text(encoding="utf-8")
+    if verified_flow.count("await tester.drag(scrollables.first, const Offset(0, -220));") != 1:
+        raise SystemExit("D2E enlarged-text readiness scroll was not installed")
 
     print(f"Prepared Task 20-D2E test overlay in {app_dir}")
     return 0
