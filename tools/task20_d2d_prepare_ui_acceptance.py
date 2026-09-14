@@ -52,17 +52,63 @@ def main() -> int:
         destination.parent.mkdir(parents=True, exist_ok=True)
         shutil.copyfile(source, destination)
 
-    # At the largest accessibility category the placeholder text can sit under
-    # the fixed bottom action even after the label itself is visible. Match the
-    # already-proven D2A interaction: target the tappable InkWell, make that
-    # control visible, and tap the control rather than the obscured Text glyphs.
+    # Rebuild the picker helper rather than patching a fragile sub-block. At the
+    # maximum Dynamic Type category the placeholder glyphs can be covered by
+    # the fixed bottom action while the enclosing control remains reachable.
+    # Match the proven D2A interaction: target the tappable InkWell, ensure that
+    # control is visible, then tap the control instead of the Text glyphs.
     support = app_dir / "integration_test" / "task20_d2d_test_support.dart"
     support_text = support.read_text(encoding="utf-8")
-    old = """      await tester.ensureVisible(labelFinder);\n      await tester.pump(const Duration(milliseconds: 250));\n      final pickerField = find\n          .ancestor(of: labelFinder, matching: find.byType(Column))\n          .first;\n      final placeholder = find.descendant(\n        of: pickerField,\n        matching: find.text('選択してください'),\n      );\n      expect(placeholder, findsOneWidget);\n      await tester.tap(placeholder);\n"""
-    new = """      final pickerField = find\n          .ancestor(of: labelFinder, matching: find.byType(Column))\n          .first;\n      final placeholder = find.descendant(\n        of: pickerField,\n        matching: find.text('選択してください'),\n      );\n      expect(placeholder, findsOneWidget);\n      final pickerTapTarget = find.ancestor(\n        of: placeholder,\n        matching: find.byType(InkWell),\n      );\n      expect(pickerTapTarget, findsOneWidget);\n      await tester.ensureVisible(pickerTapTarget.first);\n      await tester.pump(const Duration(milliseconds: 250));\n      await tester.tap(pickerTapTarget.first);\n"""
-    if support_text.count(old) != 1:
-        raise SystemExit("expected exactly one D2D picker tap block")
-    support.write_text(support_text.replace(old, new, 1), encoding="utf-8")
+    start_marker = "Future<void> chooseFirstPickerValue(\n"
+    end_marker = "\nFuture<void> selectSegmentValue(\n"
+    if support_text.count(start_marker) != 1 or support_text.count(end_marker) != 1:
+        raise SystemExit("expected exactly one D2D picker helper")
+    start = support_text.index(start_marker)
+    end = support_text.index(end_marker, start)
+    helper = """Future<void> chooseFirstPickerValue(
+  WidgetTester tester,
+  String label,
+) async {
+  final labelCandidates = find.text(label);
+  final deadline = DateTime.now().add(const Duration(seconds: 30));
+  while (DateTime.now().isBefore(deadline)) {
+    await tester.pump(const Duration(milliseconds: 250));
+    if (labelCandidates.evaluate().isNotEmpty) {
+      final labelFinder = labelCandidates.first;
+      final pickerField = find
+          .ancestor(of: labelFinder, matching: find.byType(Column))
+          .first;
+      final placeholder = find.descendant(
+        of: pickerField,
+        matching: find.text('選択してください'),
+      );
+      expect(placeholder, findsOneWidget);
+      final pickerTapTarget = find.ancestor(
+        of: placeholder,
+        matching: find.byType(InkWell),
+      );
+      expect(pickerTapTarget, findsOneWidget);
+      await tester.ensureVisible(pickerTapTarget.first);
+      await tester.pump(const Duration(milliseconds: 250));
+      await tester.tap(pickerTapTarget.first);
+      await tester.pump(const Duration(milliseconds: 500));
+      expect(find.byType(CupertinoPicker), findsOneWidget);
+      await tapText(tester, 'この数値を使う');
+      return;
+    }
+    await _scrollPrimaryVerticalScrollableForward(tester);
+  }
+  throw TestFailure('Timed out waiting for picker: $label');
+}
+"""
+    support_text = support_text[:start] + helper + support_text[end:]
+    support.write_text(support_text, encoding="utf-8")
+
+    verified = support.read_text(encoding="utf-8")
+    if "await tester.tap(placeholder);" in verified:
+        raise SystemExit("D2D picker overlay still taps obscurable placeholder text")
+    if verified.count("await tester.tap(pickerTapTarget.first);") != 1:
+        raise SystemExit("D2D picker overlay did not install the InkWell tap target")
 
     print(f"Prepared Task 20-D2D test overlay in {app_dir}")
     return 0
