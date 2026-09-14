@@ -22,6 +22,8 @@ jobs:
       max-parallel: 4
       matrix:
         content_size:
+          - accessibility-extra-extra-large
+          - accessibility-extra-extra-extra-large
           - extra-small
           - small
           - medium
@@ -32,8 +34,6 @@ jobs:
           - accessibility-medium
           - accessibility-large
           - accessibility-extra-large
-          - accessibility-extra-extra-large
-          - accessibility-extra-extra-extra-large
 
     steps:
       - name: Checkout repository
