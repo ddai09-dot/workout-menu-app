@@ -43,7 +43,7 @@ jobs:
 
       - name: Rebuild and verify canonical v0.9.23
         shell: bash
-        run: bash tools/task20_d2l_build_current_v0923.sh
+        run: bash tools/task20_d2l_build_matrix_v0923.sh
 
       - name: Install pinned Flutter SDK from official archive
         id: flutter-sdk
