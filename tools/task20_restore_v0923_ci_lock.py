@@ -13,7 +13,12 @@ from pathlib import Path
 EXPECTED_FIXTURE_SHA256 = "af9faaa6a3ded10940c3d33f2edde3847528413fe5cb0a61bc8ee05d668b2028"
 EXPECTED_LOCK_SHA256 = "2b9fd241e021b09d40222cc738da578620fda952591bfc66d95ef08d1beef599"
 EXPECTED_PUBSPEC_SHA256 = "243a2ad8e6d3afd291046523a23a8d87b32f7683b8217d8d139c68a7183a2c28"
-EXPECTED_CANDIDATE_SHA256 = "0ee2baff7fab5f02dde3dc73acb7b22f61b752805d6fc41369cf5c7ae684f2ea"
+PRE_FINALIZED_CANDIDATE_SHA256 = "0ee2baff7fab5f02dde3dc73acb7b22f61b752805d6fc41369cf5c7ae684f2ea"
+FINALIZED_CANDIDATE_SHA256 = "af20274c36f59a3f50106ddb1369f46161ed25385e0d8120375d934694e7a687"
+ACCEPTED_CANDIDATE_SHA256 = {
+    PRE_FINALIZED_CANDIDATE_SHA256,
+    FINALIZED_CANDIDATE_SHA256,
+}
 
 
 def sha256(data: bytes) -> str:
@@ -31,8 +36,12 @@ def main() -> int:
     fixture_bytes = fixture.read_bytes()
     if sha256(fixture_bytes) != EXPECTED_FIXTURE_SHA256:
         raise SystemExit("accepted CI lock fixture SHA mismatch")
-    if sha256(candidate.read_bytes()) != EXPECTED_CANDIDATE_SHA256:
-        raise SystemExit("canonical v0.9.23 candidate ZIP SHA mismatch before CI lock restore")
+    candidate_sha = sha256(candidate.read_bytes())
+    if candidate_sha not in ACCEPTED_CANDIDATE_SHA256:
+        raise SystemExit(
+            "canonical v0.9.23 candidate ZIP SHA mismatch before CI lock restore: "
+            f"{candidate_sha}"
+        )
     if sha256(pubspec.read_bytes()) != EXPECTED_PUBSPEC_SHA256:
         raise SystemExit("canonical v0.9.23 pubspec.yaml SHA mismatch before CI lock restore")
 
@@ -54,7 +63,11 @@ def main() -> int:
     print(json.dumps({
         "status": "PASS",
         "task": "Task20 v0.9.23 CI dependency lock restore",
-        "candidate_zip_sha256": EXPECTED_CANDIDATE_SHA256,
+        "candidate_zip_sha256": candidate_sha,
+        "candidate_stage": (
+            "FINALIZED_MATRIX" if candidate_sha == FINALIZED_CANDIDATE_SHA256
+            else "PRE_FINALIZED_BUILDER"
+        ),
         "pubspec_sha256": EXPECTED_PUBSPEC_SHA256,
         "pubspec_lock_sha256": EXPECTED_LOCK_SHA256,
         "lock_resolution_changed_from_v0_9_22": False,
