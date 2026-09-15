@@ -105,7 +105,7 @@ def main() -> int:
     if verified_flow.count(installed_marker) != 1:
         raise SystemExit("D2E enlarged-text readiness scroll was not installed")
     form_materialization = "await scrollToText(tester, 'フォームを確認', delta: -200);"
-    if verified_flow.count(form_materialization) != 2:
+    if verified_flow.count(form_materialization) != 3:
         raise SystemExit("D2E enlarged-text form-action materialization was not preserved")
 
     print(f"Prepared Task 20-D2E test overlay in {app_dir}")
