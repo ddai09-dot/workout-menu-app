@@ -178,6 +178,24 @@ def patch_ui_acceptance(test_path: Path) -> None:
         "goal summary lazy materialization",
     )
 
+    # The local-data-reset page also lazily builds sections at enlarged text
+    # sizes. Materialize the first destructive-data section through the same
+    # scroll helper before asserting it.
+    text = replace_exact(
+        text,
+        """      await waitForText(tester, '端末内データを初期化');
+      await waitForText(tester, '削除されるもの');
+      await scrollToTextD2G(tester, '削除されないもの');
+""",
+        """      await waitForText(tester, '端末内データを初期化');
+      await scrollToTextD2G(tester, '削除されるもの');
+      expect(find.text('削除されるもの'), findsOneWidget);
+      await scrollToTextD2G(tester, '削除されないもの');
+""",
+        1,
+        "local-data-reset lazy materialization",
+    )
+
     test_path.write_text(text, encoding="utf-8")
 
 
@@ -265,6 +283,8 @@ def main() -> int:
         raise SystemExit("D2G bottom-card enlarged-text materialization was not installed")
     if patched_test.count("final myPageContext = tester.element(navigationBar);") != 1:
         raise SystemExit("D2G stable ProviderScope context was not installed")
+    if patched_test.count("await scrollToTextD2G(tester, '削除されるもの');") != 1:
+        raise SystemExit("D2G local-data-reset enlarged-text materialization was not installed")
 
     print(f"Prepared Task 20-D2G test-only overlay in {app_dir}")
     return 0
