@@ -53,6 +53,20 @@ def patch_ui_acceptance(test_path: Path) -> None:
         "top-card lazy materialization",
     )
 
+    # The My Page title lives inside the same lazy ListView as the cards. The
+    # top-card scroll above can legitimately dispose that Text before Riverpod
+    # context acquisition. Use the persistent bottom NavigationBar instead: it
+    # is outside the lazy list but under the same application ProviderScope.
+    text = replace_exact(
+        text,
+        "      final myPageContext = tester.element(find.text('トレーニング設定'));",
+        """      final navigationBar = find.byType(NavigationBar);
+      expect(navigationBar, findsOneWidget);
+      final myPageContext = tester.element(navigationBar);""",
+        1,
+        "stable ProviderScope context",
+    )
+
     text = replace_exact(
         text,
         "await waitForText(tester, '変更を破棄しますか？');",
@@ -249,6 +263,8 @@ def main() -> int:
         raise SystemExit("D2G top-card enlarged-text materialization was not installed")
     if patched_test.count("await scrollToTextD2G(tester, '端末内データ');") < 2:
         raise SystemExit("D2G bottom-card enlarged-text materialization was not installed")
+    if patched_test.count("final myPageContext = tester.element(navigationBar);") != 1:
+        raise SystemExit("D2G stable ProviderScope context was not installed")
 
     print(f"Prepared Task 20-D2G test-only overlay in {app_dir}")
     return 0
