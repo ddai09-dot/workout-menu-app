@@ -9,7 +9,10 @@ from pathlib import Path
 
 RANGE = "  drift_dev: ^2.34.0\n"
 PIN = "  drift_dev: 2.34.0\n"
-VERSION = "version: 0.9.22+40\n"
+ACCEPTED_VERSIONS = {
+    "version: 0.9.22+40\n",
+    "version: 0.9.23+41\n",
+}
 BUILD_RUNNER = "  build_runner: 2.15.1\n"
 
 
@@ -21,8 +24,9 @@ def main() -> int:
     path = Path(sys.argv[2]).resolve()
     text = path.read_text(encoding="utf-8")
 
-    if VERSION not in text:
-        raise SystemExit("Task20 C4 transient pin requires v0.9.22+40")
+    matched_versions = [version for version in ACCEPTED_VERSIONS if version in text]
+    if len(matched_versions) != 1:
+        raise SystemExit("Task20 C4 transient pin requires an accepted v0.9.22/v0.9.23 candidate")
     if BUILD_RUNNER not in text:
         raise SystemExit("Task20 C4 transient pin requires build_runner 2.15.1")
 
@@ -58,6 +62,7 @@ def main() -> int:
                 "status": "PASS",
                 "task": "Task20 C4 transient UI-overlay dependency pin",
                 "mode": mode,
+                "candidate_version": matched_versions[0].strip().removeprefix("version: "),
                 "drift_dev": "2.34.0" if mode == "pin" else "^2.34.0",
                 "product_zip_changed": False,
                 "product_runtime_changed": False,

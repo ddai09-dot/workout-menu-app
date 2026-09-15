@@ -99,6 +99,11 @@ Future<void> waitForWorkoutStartReady(
         'Workout start summary returned the visible load-error state: $errorText',
       );
     }
+    final scrollables = find.byType(Scrollable).hitTestable();
+    if (scrollables.evaluate().isNotEmpty) {
+      await tester.drag(scrollables.first, const Offset(0, -220));
+      await tester.pump(const Duration(milliseconds: 300));
+    }
   }
 
   await binding.takeScreenshot('D2E_DIAG_start_load_timeout');
@@ -186,6 +191,7 @@ void main() {
         timeout: const Duration(seconds: 90),
       );
       await waitForText(tester, '1 / 2種目');
+      await scrollToText(tester, 'フォームを確認', delta: -200);
       expect(find.text('フォームを確認'), findsOneWidget);
       await scrollToText(tester, 'セット完了', delta: 200);
       expect(find.text('セット完了'), findsOneWidget);
@@ -217,7 +223,11 @@ void main() {
       await tapText(tester, 'セット数を変更する');
       await waitForText(tester, 'セット数');
       await selectFirstCupertinoPickerValue(tester);
-      await waitForText(tester, 'セット 1 / 1');
+      // Enlarged text places the active-set header far above the action sheet.
+      // Scroll back to it so a lazily built ListView can materialize the
+      // updated 1-set state before we assert the repository/UI transition.
+      await scrollToText(tester, 'セット 1 / 1', delta: -200);
+      expect(find.text('セット 1 / 1'), findsOneWidget);
 
       await tapText(tester, 'セット完了');
       await waitForText(tester, '休憩');
@@ -232,6 +242,7 @@ void main() {
       expect(find.text('次の種目へ'), findsOneWidget);
       await tapText(tester, '次の種目へ');
       await waitForText(tester, '2 / 2種目');
+      await scrollToText(tester, 'フォームを確認', delta: -200);
       expect(find.text('フォームを確認'), findsOneWidget);
       expectHealthyFrame(tester);
       await binding.takeScreenshot('D2E_06_next_exercise');
