@@ -242,6 +242,7 @@ void main() {
       expect(find.text('次の種目へ'), findsOneWidget);
       await tapText(tester, '次の種目へ');
       await waitForText(tester, '2 / 2種目');
+      await scrollToText(tester, 'フォームを確認', delta: -200);
       expect(find.text('フォームを確認'), findsOneWidget);
       expectHealthyFrame(tester);
       await binding.takeScreenshot('D2E_06_next_exercise');
