@@ -6,17 +6,18 @@ from __future__ import annotations
 import hashlib
 import shutil
 import stat
+import subprocess
 import sys
 import tempfile
 import zipfile
 from pathlib import Path
 
 INPUT_SHA256 = "0ee2baff7fab5f02dde3dc73acb7b22f61b752805d6fc41369cf5c7ae684f2ea"
-OUTPUT_SHA256 = "af20274c36f59a3f50106ddb1369f46161ed25385e0d8120375d934694e7a687"
+OUTPUT_SHA256 = "e73888f4121b3855dc8de842f829ce8681de927d81d494e88192ef850b669b7f"
 EXPECTED_PUBSPEC_SHA256 = "243a2ad8e6d3afd291046523a23a8d87b32f7683b8217d8d139c68a7183a2c28"
 EXPECTED_TREE_HASHES = {
-    "runtime": "9813fd38c2588305c21d426a08771f2c581ca5421b33fe04c0a54be5f070358a",
-    "product_lib": "ddae1f6f44b588c9883d5adb12811bc41dc0f6860370d19738da2cc98f6b9428",
+    "runtime": "9b451cf4f71afb8052887c456cfcc43f546c3675bdf730afa10f17bf172efa50",
+    "product_lib": "4409d422a94ff2cccce163699b9cb862955b9abfd37f831750f6b178c9d5d7cc",
     "tests": "878bdfb548bcd42afbc3def4d7c6e680fd25432c0588c05e6a7bbf50bbfeeca5",
     "schema": "bc1dcc6000defb6bde64156e6f019056bf983bcc185cfda108c1635cb754f4af",
     "assets": "cb0c88dc1b40ded797d647904f19b25916cfb8e0c1f3980b141823530ac529fe",
@@ -92,6 +93,60 @@ def main() -> int:
             """        DropdownButtonFormField<String>(\n          initialValue: draft.splitOverrideCode ?? 'DEFAULT',\n""",
             """        DropdownButtonFormField<String>(\n          isExpanded: true,\n          initialValue: draft.splitOverrideCode ?? 'DEFAULT',\n""",
         )
+
+        workout_adjustment = (
+            root / "lib/features/workout/presentation/workout_adjustment_page.dart"
+        )
+        replace_once(
+            workout_adjustment,
+            """              child: Column(\n                mainAxisSize: MainAxisSize.min,\n                crossAxisAlignment: CrossAxisAlignment.stretch,\n                children: <Widget>[\n""",
+            """              child: SingleChildScrollView(\n                child: Column(\n                  mainAxisSize: MainAxisSize.min,\n                  crossAxisAlignment: CrossAxisAlignment.stretch,\n                  children: <Widget>[\n""",
+        )
+        replace_once(
+            workout_adjustment,
+            """                ],\n              ),\n            );\n""",
+            """                  ],\n                ),\n              ),\n            );\n""",
+        )
+
+        readme = root / "README.md"
+        replace_once(
+            readme,
+            "- 週間メニュー下部の主要／修正アクションを明示的な全幅ボタンにし、拡大文字ラベルを画面幅内で折返せるようにする。\n",
+            "- 週間メニュー下部の主要／修正アクションを明示的な全幅ボタンにし、拡大文字ラベルを画面幅内で折返せるようにする。\n"
+            "- `accessibility-extra-extra-extra-large`で検出した痛み対応ボトムシートの縦overflowを、内容全体のスクロール対応で解消し、最大文字サイズでも追加ボタンまで到達可能にする。\n",
+        )
+
+        matrix = root / "docs/VERSION_MATRIX.md"
+        replace_once(
+            matrix,
+            "| 0.9.23 | 9 | Task20-D2L weekly planner enlarged-text action fix | 全12サイズmatrixで検出した調整方針画面の右36px overflowを、下部アクションの全幅・折返し対応で是正 |",
+            "| 0.9.23 | 9 | Task20-D2L enlarged-text layout fixes | 全12サイズmatrixで検出した調整方針画面の右36px overflowを下部アクションの全幅・折返し対応で是正し、最大文字サイズの痛み対応ボトムシート縦overflowをスクロール対応で是正 |",
+        )
+
+        decision = root / "docs/DECISION_LOG.md"
+        replace_once(
+            decision,
+            "- 併記：`accessibility-extra-extra-extra-large`でD2D年齢pickerのplaceholderが固定下部ボタンに覆われた件は、D2Aと同じInkWell tap target＋ensureVisible方式へharnessを統一する。\n",
+            "- 併記：`accessibility-extra-extra-extra-large`でD2D年齢pickerのplaceholderが固定下部ボタンに覆われた件は、D2Aと同じInkWell tap target＋ensureVisible方式へharnessを統一する。\n"
+            "- 追加事実：Matrix #28の`accessibility-extra-extra-extra-large`はD2A／D2Dを通過後、D2Eの痛み対応ボトムシートで`RenderFlex overflowed by 105 pixels on the bottom`を検出した。`この対応を追加する`も画面外となり操作不能だったため、製品UI不具合としてボトムシート内容を縦スクロール可能にする。\n",
+        )
+
+        for command in [
+            [sys.executable, "tools/verify_project_consistency.py"],
+            [sys.executable, "tools/verify_weekly_algorithm_traceability.py"],
+            [sys.executable, "tools/verify_task20_b_execution_lane.py"],
+        ]:
+            completed = subprocess.run(
+                command,
+                cwd=root,
+                text=True,
+                capture_output=True,
+            )
+            if completed.returncode:
+                raise SystemExit(
+                    f"v0.9.23 finalization verification failed: {' '.join(command)}\n"
+                    f"{completed.stdout}{completed.stderr}"
+                )
 
         pubspec_sha = sha256((root / "pubspec.yaml").read_bytes())
         if pubspec_sha != EXPECTED_PUBSPEC_SHA256:
