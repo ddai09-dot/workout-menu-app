@@ -35,7 +35,7 @@ def main() -> int:
         print(completed.stdout, end="")
 
     source_files = {
-        repo_root / "tools" / "task20_d2e_test_support.dart:
+        repo_root / "tools" / "task20_d2e_test_support.dart":
             app_dir / "integration_test" / "task20_d2e_test_support.dart",
         repo_root / "tools" / "task20_d2e_workout_core_flow_test.dart":
             app_dir / "integration_test" / "task20_d2e_workout_core_flow_test.dart",
