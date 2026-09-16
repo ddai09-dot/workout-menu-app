@@ -13,11 +13,11 @@ import zipfile
 from pathlib import Path
 
 INPUT_SHA256 = "0ee2baff7fab5f02dde3dc73acb7b22f61b752805d6fc41369cf5c7ae684f2ea"
-OUTPUT_SHA256 = "e73888f4121b3855dc8de842f829ce8681de927d81d494e88192ef850b669b7f"
+OUTPUT_SHA256 = "7c4b88b6fb4058f0bd1d232cb069bd45421e798a43d0b041991b091765bcbfd6"
 EXPECTED_PUBSPEC_SHA256 = "243a2ad8e6d3afd291046523a23a8d87b32f7683b8217d8d139c68a7183a2c28"
 EXPECTED_TREE_HASHES = {
-    "runtime": "9b451cf4f71afb8052887c456cfcc43f546c3675bdf730afa10f17bf172efa50",
-    "product_lib": "4409d422a94ff2cccce163699b9cb862955b9abfd37f831750f6b178c9d5d7cc",
+    "runtime": "f66638a10ac29279da8ddacb6c2eaca30db9deb39333373ac0b4551a7b6e4c82",
+    "product_lib": "e87162920b4d3358f246e2a680961fbcb38d43bd896a6ae56ef43d44e0a9344e",
     "tests": "878bdfb548bcd42afbc3def4d7c6e680fd25432c0588c05e6a7bbf50bbfeeca5",
     "schema": "bc1dcc6000defb6bde64156e6f019056bf983bcc185cfda108c1635cb754f4af",
     "assets": "cb0c88dc1b40ded797d647904f19b25916cfb8e0c1f3980b141823530ac529fe",
@@ -108,19 +108,27 @@ def main() -> int:
             """                  ],\n                ),\n              ),\n            );\n""",
         )
 
+        workout_session = root / "lib/features/workout/presentation/workout_session_page.dart"
+        replace_once(
+            workout_session,
+            """    return ListTile(\n      contentPadding: EdgeInsets.zero,\n      title: Text(label),\n      trailing: Row(\n        mainAxisSize: MainAxisSize.min,\n        children: <Widget>[\n          Text(value, style: Theme.of(context).textTheme.titleMedium),\n          const SizedBox(width: 4),\n          const Icon(Icons.unfold_more),\n        ],\n      ),\n      onTap: onTap,\n    );\n""",
+            """    return ListTile(\n      contentPadding: EdgeInsets.zero,\n      title: Text(label),\n      subtitle: Text(value, style: Theme.of(context).textTheme.titleMedium),\n      trailing: const Icon(Icons.unfold_more),\n      onTap: onTap,\n    );\n""",
+        )
+
         readme = root / "README.md"
         replace_once(
             readme,
             "- 週間メニュー下部の主要／修正アクションを明示的な全幅ボタンにし、拡大文字ラベルを画面幅内で折返せるようにする。\n",
             "- 週間メニュー下部の主要／修正アクションを明示的な全幅ボタンにし、拡大文字ラベルを画面幅内で折返せるようにする。\n"
-            "- `accessibility-extra-extra-extra-large`で検出した痛み対応ボトムシートの縦overflowを、内容全体のスクロール対応で解消し、最大文字サイズでも追加ボタンまで到達可能にする。\n",
+            "- `accessibility-extra-extra-extra-large`で検出した痛み対応ボトムシートの縦overflowを、内容全体のスクロール対応で解消し、最大文字サイズでも追加ボタンまで到達可能にする。\n"
+            "- トレーニング中の入力行は値をラベル下へ配置し、最大文字サイズでも値＋操作アイコンが横幅を奪い合わない構造にする。\n",
         )
 
         matrix = root / "docs/VERSION_MATRIX.md"
         replace_once(
             matrix,
             "| 0.9.23 | 9 | Task20-D2L weekly planner enlarged-text action fix | 全12サイズmatrixで検出した調整方針画面の右36px overflowを、下部アクションの全幅・折返し対応で是正 |",
-            "| 0.9.23 | 9 | Task20-D2L enlarged-text layout fixes | 全12サイズmatrixで検出した調整方針画面の右36px overflowを下部アクションの全幅・折返し対応で是正し、最大文字サイズの痛み対応ボトムシート縦overflowをスクロール対応で是正 |",
+            "| 0.9.23 | 9 | Task20-D2L enlarged-text layout fixes | 全12サイズmatrixで検出した調整方針画面の右36px overflowを下部アクションの全幅・折返し対応で是正し、最大文字サイズの痛み対応ボトムシート縦overflowとトレーニング入力行の横overflowを是正 |",
         )
 
         decision = root / "docs/DECISION_LOG.md"
@@ -128,7 +136,8 @@ def main() -> int:
             decision,
             "- 併記：`accessibility-extra-extra-extra-large`でD2D年齢pickerのplaceholderが固定下部ボタンに覆われた件は、D2Aと同じInkWell tap target＋ensureVisible方式へharnessを統一する。\n",
             "- 併記：`accessibility-extra-extra-extra-large`でD2D年齢pickerのplaceholderが固定下部ボタンに覆われた件は、D2Aと同じInkWell tap target＋ensureVisible方式へharnessを統一する。\n"
-            "- 追加事実：Matrix #28の`accessibility-extra-extra-extra-large`はD2A／D2Dを通過後、D2Eの痛み対応ボトムシートで`RenderFlex overflowed by 105 pixels on the bottom`を検出した。`この対応を追加する`も画面外となり操作不能だったため、製品UI不具合としてボトムシート内容を縦スクロール可能にする。\n",
+            "- 追加事実：Matrix #28の`accessibility-extra-extra-extra-large`はD2A／D2Dを通過後、D2Eの痛み対応ボトムシートで`RenderFlex overflowed by 105 pixels on the bottom`を検出した。`この対応を追加する`も画面外となり操作不能だったため、製品UI不具合としてボトムシート内容を縦スクロール可能にする。\n"
+            "- 追加事実：Matrix #52の同カテゴリは上記修正とD2E lazy-materialization hardeningを通過後、トレーニング中の入力`ListTile`で値＋操作アイコンのtrailing `Row`が49px横overflowすることを検出した。値をsubtitleへ移して操作アイコンのみをtrailingに残し、拡大文字でも横幅競合しない構造へ変更する。\n",
         )
 
         for command in [
