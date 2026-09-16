@@ -104,9 +104,12 @@ def main() -> int:
     verified_flow = flow.read_text(encoding="utf-8")
     if verified_flow.count(installed_marker) != 1:
         raise SystemExit("D2E enlarged-text readiness scroll was not installed")
-    form_materialization = "await scrollToText(tester, 'フォームを確認', delta: -200);"
-    if verified_flow.count(form_materialization) != 3:
-        raise SystemExit("D2E enlarged-text form-action materialization was not preserved")
+    forward_form_materialization = "await scrollToText(tester, 'フォームを確認', delta: 200);"
+    backward_form_materialization = "await scrollToText(tester, 'フォームを確認', delta: -200);"
+    if verified_flow.count(forward_form_materialization) != 2:
+        raise SystemExit("D2E forward form-action materialization was not preserved")
+    if verified_flow.count(backward_form_materialization) != 1:
+        raise SystemExit("D2E backward form-action materialization was not preserved")
     lazy_scroll_marker = "Timed out materializing text while scrolling: $text"
     if verified_flow.count(lazy_scroll_marker) != 1:
         raise SystemExit("D2E lazy text materialization helper was not preserved")
