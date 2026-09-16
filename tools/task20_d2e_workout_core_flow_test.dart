@@ -137,14 +137,29 @@ Future<void> scrollToText(
   double delta = 300,
   bool useLastScrollable = false,
 }) async {
-  final scrollables = find.byType(Scrollable);
-  expect(scrollables, findsWidgets);
-  await tester.scrollUntilVisible(
-    find.text(text),
-    delta,
-    scrollable: useLastScrollable ? scrollables.last : scrollables.first,
+  final target = find.text(text);
+  final movement = delta.abs();
+  for (var attempt = 0; attempt < 20; attempt++) {
+    if (target.evaluate().isNotEmpty) {
+      await tester.ensureVisible(target.first);
+      await tester.pump(const Duration(milliseconds: 300));
+      return;
+    }
+
+    final scrollables = find.byType(Scrollable).hitTestable();
+    expect(scrollables, findsWidgets);
+    final scrollable = useLastScrollable ? scrollables.last : scrollables.first;
+    await tester.drag(
+      scrollable,
+      Offset(0, delta >= 0 ? -movement : movement),
+    );
+    await tester.pump(const Duration(milliseconds: 300));
+  }
+
+  throw TestFailure(
+    'Timed out materializing text while scrolling: $text; '
+    'visibleTexts=${_visibleTextSnapshot()}',
   );
-  await tester.pump(const Duration(milliseconds: 300));
 }
 
 void main() {
