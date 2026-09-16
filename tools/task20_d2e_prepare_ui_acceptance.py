@@ -35,7 +35,7 @@ def main() -> int:
         print(completed.stdout, end="")
 
     source_files = {
-        repo_root / "tools" / "task20_d2e_test_support.dart":
+        repo_root / "tools" / "task20_d2e_test_support.dart:
             app_dir / "integration_test" / "task20_d2e_test_support.dart",
         repo_root / "tools" / "task20_d2e_workout_core_flow_test.dart":
             app_dir / "integration_test" / "task20_d2e_workout_core_flow_test.dart",
@@ -107,6 +107,11 @@ def main() -> int:
     form_materialization = "await scrollToText(tester, 'フォームを確認', delta: -200);"
     if verified_flow.count(form_materialization) != 3:
         raise SystemExit("D2E enlarged-text form-action materialization was not preserved")
+    lazy_scroll_marker = "Timed out materializing text while scrolling: $text"
+    if verified_flow.count(lazy_scroll_marker) != 1:
+        raise SystemExit("D2E lazy text materialization helper was not preserved")
+    if "tester.scrollUntilVisible(" in verified_flow:
+        raise SystemExit("D2E restored scrollUntilVisible, which cannot materialize lazy text")
 
     print(f"Prepared Task 20-D2E test overlay in {app_dir}")
     return 0
