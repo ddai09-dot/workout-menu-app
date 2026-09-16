@@ -147,14 +147,13 @@ run_device() {
   local previous_raster="$device_dir/readiness_previous.bmp"
   local current_raster="$device_dir/readiness_current.bmp"
   local first_sample="$device_dir/first_sample.png"
-  local started_epoch elapsed stable_transitions=0 attempt=0
+  local started_epoch="" elapsed=0 stable_transitions=0 attempt=0
   local required_transitions=$((REQUIRED_STABLE_SAMPLES - 1))
   if (( REQUIRED_STABLE_SAMPLES < 2 )); then
     echo "ERROR: TASK20_D1_REQUIRED_STABLE_SAMPLES must be at least 2." >&2
     return 2
   fi
   rm -f "$previous_sample" "$current_sample" "$previous_raster" "$current_raster" "$first_sample" "$screenshot"
-  started_epoch="$(date +%s)"
   while true; do
     attempt=$((attempt + 1))
     xcrun simctl io "$udid" screenshot "$current_sample" >>"$command_log" 2>&1
@@ -162,6 +161,11 @@ run_device() {
     normalize_stability_sample "$current_sample" "$current_raster"
     if (( attempt == 1 )); then
       cp "$current_sample" "$first_sample"
+      # Hosted Simulator runners can spend several minutes returning the first
+      # screenshot even though the app is already launched. Start the stability
+      # observation clock only after that first usable frame exists; otherwise
+      # capture latency is misreported as an unstable application.
+      started_epoch="$(date +%s)"
     fi
     if [[ -f "$previous_raster" ]] && cmp -s "$previous_raster" "$current_raster"; then
       stable_transitions=$((stable_transitions + 1))
@@ -173,9 +177,12 @@ run_device() {
       cp "$current_sample" "$screenshot"
       break
     fi
-    if (( elapsed >= MAX_WAIT_SECONDS )); then
+    # Always collect at least the requested number of samples before declaring
+    # instability. This prevents a slow first/second simctl capture from
+    # exhausting the wall-clock budget before a stability comparison is possible.
+    if (( attempt >= REQUIRED_STABLE_SAMPLES && elapsed >= MAX_WAIT_SECONDS )); then
       cp "$current_sample" "$screenshot"
-      echo "ERROR: Screen did not become stable within ${MAX_WAIT_SECONDS}s for $role." >&2
+      echo "ERROR: Screen did not become stable within ${MAX_WAIT_SECONDS}s after the first usable frame for $role." >&2
       return 1
     fi
     mv "$current_sample" "$previous_sample"
