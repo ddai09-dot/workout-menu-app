@@ -172,7 +172,7 @@ void main() {
       await binding.takeScreenshot('D2G_04_goal_saved');
 
       await scrollToTextD2G(tester, '痛み・身体上の制限');
-      await tapText(tester, '痛み・身体上の制限');
+      await tapVisibleTextD2G(tester, '痛み・身体上の制限');
       await waitForText(tester, '現在、痛みや違和感がある部位');
       await tapTextAt(tester, '肩', 0);
       expectSaveButtonEnabled(tester, true);
