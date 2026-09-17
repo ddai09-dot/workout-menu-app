@@ -15,9 +15,11 @@ EXPECTED_LOCK_SHA256 = "2b9fd241e021b09d40222cc738da578620fda952591bfc66d95ef08d
 EXPECTED_PUBSPEC_SHA256 = "243a2ad8e6d3afd291046523a23a8d87b32f7683b8217d8d139c68a7183a2c28"
 PRE_FINALIZED_CANDIDATE_SHA256 = "0ee2baff7fab5f02dde3dc73acb7b22f61b752805d6fc41369cf5c7ae684f2ea"
 FINALIZED_CANDIDATE_SHA256 = "7c4b88b6fb4058f0bd1d232cb069bd45421e798a43d0b041991b091765bcbfd6"
+PATCHED_FINALIZED_CANDIDATE_SHA256 = "7f3c94666b25fa8dfcc28e1c6c3ab55f4ed3133506157840440cb835a13fddf8"
 ACCEPTED_CANDIDATE_SHA256 = {
     PRE_FINALIZED_CANDIDATE_SHA256,
     FINALIZED_CANDIDATE_SHA256,
+    PATCHED_FINALIZED_CANDIDATE_SHA256,
 }
 
 
@@ -60,14 +62,18 @@ def main() -> int:
     if drift_start < 0 or '    version: "2.34.0"\n' not in text[drift_start:drift_start + 700]:
         raise SystemExit("accepted drift_dev 2.34.0 resolution missing from restored lock")
 
+    if candidate_sha == PATCHED_FINALIZED_CANDIDATE_SHA256:
+        candidate_stage = "PATCHED_FINALIZED_MATRIX"
+    elif candidate_sha == FINALIZED_CANDIDATE_SHA256:
+        candidate_stage = "FINALIZED_MATRIX"
+    else:
+        candidate_stage = "PRE_FINALIZED_BUILDER"
+
     print(json.dumps({
         "status": "PASS",
         "task": "Task20 v0.9.23 CI dependency lock restore",
         "candidate_zip_sha256": candidate_sha,
-        "candidate_stage": (
-            "FINALIZED_MATRIX" if candidate_sha == FINALIZED_CANDIDATE_SHA256
-            else "PRE_FINALIZED_BUILDER"
-        ),
+        "candidate_stage": candidate_stage,
         "pubspec_sha256": EXPECTED_PUBSPEC_SHA256,
         "pubspec_lock_sha256": EXPECTED_LOCK_SHA256,
         "lock_resolution_changed_from_v0_9_22": False,
