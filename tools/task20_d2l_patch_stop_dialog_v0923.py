@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Apply the Matrix #53 AXXXL stop-confirmation accessibility fix."""
+"""Apply Matrix #53/#62 AXXXL dialog accessibility fixes."""
 
 from __future__ import annotations
 
@@ -11,10 +11,10 @@ import zipfile
 from pathlib import Path
 
 INPUT_SHA256 = "7c4b88b6fb4058f0bd1d232cb069bd45421e798a43d0b041991b091765bcbfd6"
-OUTPUT_SHA256 = "7f3c94666b25fa8dfcc28e1c6c3ab55f4ed3133506157840440cb835a13fddf8"
+OUTPUT_SHA256 = "84675f0c90df6de2c704e1d1812aaf5797290c273e9b726678ad5709ab8480e8"
 EXPECTED_TREE_HASHES = {
-    "runtime": "7b15ff8dbac6a6342c8300e74ee84533a1bea2c1b8c6f0247914230a3efa25bb",
-    "product_lib": "2e5106ac8112577ec11c422495241ff6fe2d1911b529444898534f1bfb9d512c",
+    "runtime": "147be8bc795b9088e1f9ae08a944a1a07625486a22e11ecaa862cad7b078dda2",
+    "product_lib": "bad1291db5b248d8981642b6b57e6c92619a0cbdfab74d71706ee7e994777900",
     "tests": "878bdfb548bcd42afbc3def4d7c6e680fd25432c0588c05e6a7bbf50bbfeeca5",
     "schema": "bc1dcc6000defb6bde64156e6f019056bf983bcc185cfda108c1635cb754f4af",
     "assets": "cb0c88dc1b40ded797d647904f19b25916cfb8e0c1f3980b141823530ac529fe",
@@ -74,7 +74,7 @@ def main() -> int:
     if actual_input != INPUT_SHA256:
         raise SystemExit(f"unexpected input v0.9.23 SHA: {actual_input}")
 
-    with tempfile.TemporaryDirectory(prefix="task20-d2l-stop-dialog-") as temp_dir:
+    with tempfile.TemporaryDirectory(prefix="task20-d2l-dialogs-") as temp_dir:
         root = Path(temp_dir) / "app"
         root.mkdir()
         with zipfile.ZipFile(candidate) as archive:
@@ -87,12 +87,19 @@ def main() -> int:
             """    builder: (BuildContext context) => AlertDialog(\n      scrollable: true,\n      title: const Text('ここまでを記録して終了しますか？'),\n""",
         )
 
+        settings = root / "lib/features/settings/presentation/training_settings_edit_page.dart"
+        replace_once(
+            settings,
+            """        return AlertDialog(\n          title: const Text('変更を破棄しますか？'),\n""",
+            """        return AlertDialog(\n          scrollable: true,\n          title: const Text('変更を破棄しますか？'),\n""",
+        )
+
         readme = root / "README.md"
         existing = "- トレーニング中の入力行は値をラベル下へ配置し、最大文字サイズでも値＋操作アイコンが横幅を奪い合わない構造にする。\n"
         replace_once(
             readme,
             existing,
-            existing + "- 途中終了の確認ダイアログをスクロール対応にし、最大文字サイズでも説明と終了操作を画面内で利用できるようにする。\n",
+            existing + "- 途中終了の確認ダイアログをスクロール対応にし、最大文字サイズでも説明と終了操作を画面内で利用できるようにする。\n" + "- 設定編集の変更破棄ダイアログもスクロール対応にし、最大文字サイズでも確認文と操作を欠落させない。\n",
         )
 
         decision = root / "docs/DECISION_LOG.md"
@@ -100,7 +107,7 @@ def main() -> int:
         replace_once(
             decision,
             existing,
-            existing + "- 追加事実：Matrix #53の同カテゴリは入力行修正後さらにD2Eを進行し、途中終了確認`AlertDialog`で159pxの縦overflowを検出した。ダイアログをスクロール対応にし、最大文字サイズでも確認文と終了操作の到達性を維持する。\n",
+            existing + "- 追加事実：Matrix #53の同カテゴリは入力行修正後さらにD2Eを進行し、途中終了確認`AlertDialog`で159pxの縦overflowを検出した。ダイアログをスクロール対応にし、最大文字サイズでも確認文と終了操作の到達性を維持する。\n" + "- 追加事実：Matrix #62は11/12カテゴリPASS。AXXXLはD1／D2A／D2D／D2Eを通過後、設定編集の変更破棄`AlertDialog`で24pxの縦overflowを検出した。ダイアログをスクロール対応にし、最大文字サイズでも破棄確認操作の到達性を維持する。\n",
         )
 
         files = package_files(root)
@@ -125,7 +132,7 @@ def main() -> int:
         if hashes != EXPECTED_TREE_HASHES:
             raise SystemExit(f"patched v0.9.23 tree mismatch: {hashes}")
 
-        staged = candidate.with_suffix(".stop-dialog.zip")
+        staged = candidate.with_suffix(".dialogs.zip")
         staged.unlink(missing_ok=True)
         with zipfile.ZipFile(
             staged, "w", compression=zipfile.ZIP_DEFLATED, compresslevel=9
@@ -153,7 +160,7 @@ def main() -> int:
         staged.replace(candidate)
 
     print(
-        "patched v0.9.23 stop dialog: "
+        "patched v0.9.23 dialogs: "
         f"sha256={OUTPUT_SHA256} runtime={EXPECTED_TREE_HASHES['runtime']}"
     )
     return 0
