@@ -99,6 +99,11 @@ Future<void> waitForWorkoutStartReady(
         'Workout start summary returned the visible load-error state: $errorText',
       );
     }
+    final scrollables = find.byType(Scrollable).hitTestable();
+    if (scrollables.evaluate().isNotEmpty) {
+      await tester.drag(scrollables.first, const Offset(0, -220));
+      await tester.pump(const Duration(milliseconds: 300));
+    }
   }
 
   await binding.takeScreenshot('D2E_DIAG_start_load_timeout');
@@ -132,14 +137,29 @@ Future<void> scrollToText(
   double delta = 300,
   bool useLastScrollable = false,
 }) async {
-  final scrollables = find.byType(Scrollable);
-  expect(scrollables, findsWidgets);
-  await tester.scrollUntilVisible(
-    find.text(text),
-    delta,
-    scrollable: useLastScrollable ? scrollables.last : scrollables.first,
+  final target = find.text(text);
+  final movement = delta.abs();
+  for (var attempt = 0; attempt < 20; attempt++) {
+    if (target.evaluate().isNotEmpty) {
+      await tester.ensureVisible(target.first);
+      await tester.pump(const Duration(milliseconds: 300));
+      return;
+    }
+
+    final scrollables = find.byType(Scrollable).hitTestable();
+    expect(scrollables, findsWidgets);
+    final scrollable = useLastScrollable ? scrollables.last : scrollables.first;
+    await tester.drag(
+      scrollable,
+      Offset(0, delta >= 0 ? -movement : movement),
+    );
+    await tester.pump(const Duration(milliseconds: 300));
+  }
+
+  throw TestFailure(
+    'Timed out materializing text while scrolling: $text; '
+    'visibleTexts=${_visibleTextSnapshot()}',
   );
-  await tester.pump(const Duration(milliseconds: 300));
 }
 
 void main() {
@@ -186,6 +206,7 @@ void main() {
         timeout: const Duration(seconds: 90),
       );
       await waitForText(tester, '1 / 2種目');
+      await scrollToText(tester, 'フォームを確認', delta: 200);
       expect(find.text('フォームを確認'), findsOneWidget);
       await scrollToText(tester, 'セット完了', delta: 200);
       expect(find.text('セット完了'), findsOneWidget);
@@ -217,7 +238,11 @@ void main() {
       await tapText(tester, 'セット数を変更する');
       await waitForText(tester, 'セット数');
       await selectFirstCupertinoPickerValue(tester);
-      await waitForText(tester, 'セット 1 / 1');
+      // Enlarged text places the active-set header far above the action sheet.
+      // Scroll back to it so a lazily built ListView can materialize the
+      // updated 1-set state before we assert the repository/UI transition.
+      await scrollToText(tester, 'セット 1 / 1', delta: -200);
+      expect(find.text('セット 1 / 1'), findsOneWidget);
 
       await tapText(tester, 'セット完了');
       await waitForText(tester, '休憩');
@@ -232,6 +257,7 @@ void main() {
       expect(find.text('次の種目へ'), findsOneWidget);
       await tapText(tester, '次の種目へ');
       await waitForText(tester, '2 / 2種目');
+      await scrollToText(tester, 'フォームを確認', delta: 200);
       expect(find.text('フォームを確認'), findsOneWidget);
       expectHealthyFrame(tester);
       await binding.takeScreenshot('D2E_06_next_exercise');

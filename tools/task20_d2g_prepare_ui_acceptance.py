@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import shutil
+import subprocess
 import sys
 from pathlib import Path
 
@@ -24,6 +25,47 @@ def replace_exact(
 
 def patch_ui_acceptance(test_path: Path) -> None:
     text = test_path.read_text(encoding="utf-8")
+
+    # At AXXL the My Page cards cannot all remain materialized in the ListView
+    # at once. Verify the top cards one at a time through the same user-scroll
+    # path instead of assuming both Text widgets exist immediately after route
+    # navigation, then restore the first card for the top screenshot.
+    text = replace_exact(
+        text,
+        """      await tapNavigationLabelD2G(tester, 'マイページ');
+      await waitForText(tester, 'トレーニング設定');
+      expect(find.text('トレーニング目的'), findsOneWidget);
+      expect(find.text('経験・継続状況'), findsOneWidget);
+      expectHealthyFrame(tester);
+      await binding.takeScreenshot('D2G_01_my_page_sections_top');
+""",
+        """      await tapNavigationLabelD2G(tester, 'マイページ');
+      await waitForText(tester, 'トレーニング設定');
+      await scrollToTextD2G(tester, 'トレーニング目的');
+      expect(find.text('トレーニング目的'), findsOneWidget);
+      await scrollToTextD2G(tester, '経験・継続状況');
+      expect(find.text('経験・継続状況'), findsOneWidget);
+      await scrollToTextD2G(tester, 'トレーニング目的');
+      expectHealthyFrame(tester);
+      await binding.takeScreenshot('D2G_01_my_page_sections_top');
+""",
+        1,
+        "top-card lazy materialization",
+    )
+
+    # The My Page title lives inside the same lazy ListView as the cards. The
+    # top-card scroll above can legitimately dispose that Text before Riverpod
+    # context acquisition. Use the persistent bottom NavigationBar instead: it
+    # is outside the lazy list but under the same application ProviderScope.
+    text = replace_exact(
+        text,
+        "      final myPageContext = tester.element(find.text('トレーニング設定'));",
+        """      final navigationBar = find.byType(NavigationBar);
+      expect(navigationBar, findsOneWidget);
+      final myPageContext = tester.element(navigationBar);""",
+        1,
+        "stable ProviderScope context",
+    )
 
     text = replace_exact(
         text,
@@ -99,6 +141,61 @@ def patch_ui_acceptance(test_path: Path) -> None:
         "FAQ return route",
     )
 
+    # The two bottom cards also separate at AXXL. Materialize and verify them
+    # independently rather than requiring the next card to coexist with FAQ.
+    text = replace_exact(
+        text,
+        """      await scrollToTextD2G(tester, '用語・FAQ');
+      expect(find.text('端末内データ'), findsOneWidget);
+      expectHealthyFrame(tester);
+      await binding.takeScreenshot('D2G_02_my_page_sections_bottom');
+""",
+        """      await scrollToTextD2G(tester, '用語・FAQ');
+      expect(find.text('用語・FAQ'), findsOneWidget);
+      await scrollToTextD2G(tester, '端末内データ');
+      expect(find.text('端末内データ'), findsOneWidget);
+      expectHealthyFrame(tester);
+      await binding.takeScreenshot('D2G_02_my_page_sections_bottom');
+""",
+        1,
+        "bottom-card lazy materialization",
+    )
+
+    # Saving a goal returns to My Page, but at extreme text sizes the summary
+    # card can be lazily absent until scrolled back into view.
+    text = replace_exact(
+        text,
+        """      expect(await snapshotCurrentMenu(database), menuBeforeSettings);
+      await waitForText(tester, '筋力を高めたい');
+      expectHealthyFrame(tester);
+""",
+        """      expect(await snapshotCurrentMenu(database), menuBeforeSettings);
+      await scrollToTextD2G(tester, 'トレーニング目的');
+      await waitForText(tester, '筋力を高めたい');
+      expectHealthyFrame(tester);
+""",
+        1,
+        "goal summary lazy materialization",
+    )
+
+    # The local-data-reset page also lazily builds sections at enlarged text
+    # sizes. Materialize the first destructive-data section through the same
+    # scroll helper before asserting it.
+    text = replace_exact(
+        text,
+        """      await waitForText(tester, '端末内データを初期化');
+      await waitForText(tester, '削除されるもの');
+      await scrollToTextD2G(tester, '削除されないもの');
+""",
+        """      await waitForText(tester, '端末内データを初期化');
+      await scrollToTextD2G(tester, '削除されるもの');
+      expect(find.text('削除されるもの'), findsOneWidget);
+      await scrollToTextD2G(tester, '削除されないもの');
+""",
+        1,
+        "local-data-reset lazy materialization",
+    )
+
     test_path.write_text(text, encoding="utf-8")
 
 
@@ -112,12 +209,28 @@ def main() -> int:
     if not pubspec.is_file():
         raise SystemExit(f"pubspec.yaml not found: {pubspec}")
 
+    # D2G also depends on the shared D2D onboarding helper. Re-run the D2D
+    # preparer instead of raw-copying task20_d2d_test_support.dart, otherwise
+    # this later preparer would undo the maximum-Dynamic-Type picker and
+    # segmented-control reachability normalization installed by D2D/D2E.
+    d2d_prepare = repo_root / "tools" / "task20_d2d_prepare_ui_acceptance.py"
+    completed = subprocess.run(
+        [sys.executable, str(d2d_prepare), str(app_dir)],
+        text=True,
+        capture_output=True,
+    )
+    if completed.returncode != 0:
+        raise SystemExit(
+            "D2G could not prepare its D2D dependency:\n"
+            f"{completed.stdout}{completed.stderr}"
+        )
+    if completed.stdout:
+        print(completed.stdout, end="")
+
     test_destination = (
         app_dir / "integration_test" / "task20_d2g_my_page_settings_test.dart"
     )
     source_files = {
-        repo_root / "tools" / "task20_d2d_test_support.dart":
-            app_dir / "integration_test" / "task20_d2d_test_support.dart",
         repo_root / "tools" / "task20_d2e_test_support.dart":
             app_dir / "integration_test" / "task20_d2e_test_support.dart",
         repo_root / "tools" / "task20_d2g_test_support.dart":
@@ -153,6 +266,25 @@ def main() -> int:
         destination.parent.mkdir(parents=True, exist_ok=True)
         shutil.copyfile(source, destination)
     patch_ui_acceptance(test_destination)
+
+    d2d_support = app_dir / "integration_test" / "task20_d2d_test_support.dart"
+    d2d_text = d2d_support.read_text(encoding="utf-8")
+    if "await tester.tap(placeholder);" in d2d_text:
+        raise SystemExit("D2G preparation restored the obsolete D2D placeholder tap")
+    if d2d_text.count("await tester.tap(pickerTapTarget.first);") != 1:
+        raise SystemExit("D2G preparation lost the D2D InkWell picker target")
+    if d2d_text.count("await tester.tap(tappableValue.first);") != 1:
+        raise SystemExit("D2G preparation lost the D2D reachable segmented target")
+
+    patched_test = test_destination.read_text(encoding="utf-8")
+    if patched_test.count("await scrollToTextD2G(tester, '経験・継続状況');") != 1:
+        raise SystemExit("D2G top-card enlarged-text materialization was not installed")
+    if patched_test.count("await scrollToTextD2G(tester, '端末内データ');") < 2:
+        raise SystemExit("D2G bottom-card enlarged-text materialization was not installed")
+    if patched_test.count("final myPageContext = tester.element(navigationBar);") != 1:
+        raise SystemExit("D2G stable ProviderScope context was not installed")
+    if patched_test.count("await scrollToTextD2G(tester, '削除されるもの');") != 1:
+        raise SystemExit("D2G local-data-reset enlarged-text materialization was not installed")
 
     print(f"Prepared Task 20-D2G test-only overlay in {app_dir}")
     return 0

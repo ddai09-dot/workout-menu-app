@@ -33,6 +33,12 @@ if blob_sha != expected_blob_sha:
     )
 
 text = raw.decode("utf-8")
+old_target_category = 'TARGET_CATEGORY="accessibility-extra-large"\n'
+new_target_category = 'TARGET_CATEGORY="${TASK20_D2J_CONTENT_SIZE:-accessibility-extra-large}"\n'
+if text.count(old_target_category) != 1:
+    raise SystemExit("Expected exactly one D2J Dynamic Type target category")
+text = text.replace(old_target_category, new_target_category, 1)
+
 old_attempt_var = 'MAX_STARTUP_ATTEMPTS="${TASK20_D2J_MAX_STARTUP_ATTEMPTS:-2}"\n'
 new_attempt_var = (
     old_attempt_var
@@ -135,6 +141,7 @@ metadata_path.write_text(
             "expected_source_git_blob_sha1": expected_blob_sha,
             "generated_runner": str(destination),
             "generated_runner_location_preserves_repo_root": True,
+            "dynamic_type_target_parameterized": True,
             "fresh_attempt_calls_replaced": call_count,
             "retry_reset_mode": "warm-retry-no-erase",
             "d2d_phase1_max_startup_attempts": 3,
