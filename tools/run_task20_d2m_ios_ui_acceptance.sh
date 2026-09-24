@@ -7,6 +7,7 @@ D1_DEVICE_FILE="${TASK20_D1_DEVICE_FILE:-$APP_DIR/build/task20_d1_ios_launch_smo
 LOG_DIR="${TASK20_D2M_LOG_DIR:-$APP_DIR/build/task20_d2m_rest_day_rollover}"
 TRIGGER_TIMEOUT_SECONDS="${TASK20_D2M_TRIGGER_TIMEOUT_SECONDS:-1200}"
 VERIFY_TIMEOUT_SECONDS="${TASK20_D2M_VERIFY_TIMEOUT_SECONDS:-900}"
+VERIFY_MAX_STARTUP_ATTEMPTS="${TASK20_D2M_VERIFY_MAX_STARTUP_ATTEMPTS:-2}"
 APP_BUNDLE="$APP_DIR/build/ios/iphonesimulator/Runner.app"
 
 rm -rf "$LOG_DIR"
@@ -161,10 +162,52 @@ printf '%s\n' "$trigger_exit_code" > "$LOG_DIR/trigger_exit_code.txt"
 set_stage "restart_verification"
 xcrun simctl bootstatus "$udid" -b
 sleep 2
-(
-  cd "$APP_DIR"
-  TASK20_D2_SCREENSHOT_DIR="$screenshot_dir"     python3 "$ROOT/tools/task20_d2a_run_with_timeout.py"       --timeout-seconds "$VERIFY_TIMEOUT_SECONDS"       --log-file "$verify_log"       --result-file "$verify_result"       --       flutter drive         --keep-app-running         --no-dds         --driver=test_driver/task20_d2e_driver.dart         --target=integration_test/task20_d2m_rest_day_rollover_verify_test.dart         -d "$udid"
-)
+
+verify_successful_attempt=0
+verify_final_code=1
+for verify_attempt in $(seq 1 "$VERIFY_MAX_STARTUP_ATTEMPTS"); do
+  verify_attempt_log="$LOG_DIR/verify_flutter_drive_attempt_$verify_attempt.log"
+  verify_attempt_result="$LOG_DIR/verify_flutter_drive_attempt_$verify_attempt.json"
+  set +e
+  (
+    cd "$APP_DIR"
+    TASK20_D2_SCREENSHOT_DIR="$screenshot_dir"       python3 "$ROOT/tools/task20_d2a_run_with_timeout.py"         --timeout-seconds "$VERIFY_TIMEOUT_SECONDS"         --log-file "$verify_attempt_log"         --result-file "$verify_attempt_result"         --         flutter drive           --keep-app-running           --no-dds           --driver=test_driver/task20_d2e_driver.dart           --target=integration_test/task20_d2m_rest_day_rollover_verify_test.dart           -d "$udid"
+  )
+  verify_code="$?"
+  set -e
+
+  if [[ "$verify_code" -eq 0 ]]; then
+    cp "$verify_attempt_log" "$verify_log"
+    cp "$verify_attempt_result" "$verify_result"
+    verify_successful_attempt="$verify_attempt"
+    verify_final_code=0
+    break
+  fi
+
+  cp "$verify_attempt_log" "$verify_log"
+  cp "$verify_attempt_result" "$verify_result"
+
+  verify_retryable_startup_failure=false
+  if [[ ! -s "$screenshot_dir/D2M_02_home_resume_after_restart.png" ]] &&     grep -Eqi       'Application failed to start|Error waiting for a debug connection|log reader failed unexpectedly|Unable to launch|Failed to start'       "$verify_attempt_log"; then
+    verify_retryable_startup_failure=true
+  fi
+
+  if [[ "$verify_retryable_startup_failure" == true && "$verify_attempt" -lt "$VERIFY_MAX_STARTUP_ATTEMPTS" ]]; then
+    echo "Task 20-D2M verify startup infrastructure failure; retrying without erasing persisted state."
+    xcrun simctl terminate "$udid" "$BUNDLE_ID" >/dev/null 2>&1 || true
+    xcrun simctl bootstatus "$udid" -b
+    sleep 2
+    continue
+  fi
+
+  verify_final_code="$verify_code"
+  break
+done
+
+printf '%s\n' "$verify_successful_attempt" > "$LOG_DIR/verify_successful_attempt.txt"
+if [[ "$verify_final_code" -ne 0 ]]; then
+  exit "$verify_final_code"
+fi
 
 set_stage "acceptance_assertions"
 for required in   D2M_01_rest_before_termination.png   D2M_02_home_resume_after_restart.png   D2M_03_rest_restored_after_restart.png   D2M_04_advanced_after_restart.png; do
