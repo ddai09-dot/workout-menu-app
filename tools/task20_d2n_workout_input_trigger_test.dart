@@ -90,7 +90,7 @@ void main() {
           );
       await _waitForPersistedReps(container, initial.sessionId);
       await _scrollToText(tester, '回数');
-      await waitForText(tester, '${d2nSentinelReps}回');
+      await waitForText(tester, '$d2nSentinelReps回');
       expectHealthyFrame(tester);
 
       final sessionRow = await database.customSelect(

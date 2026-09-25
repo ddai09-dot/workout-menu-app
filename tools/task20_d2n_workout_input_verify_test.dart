@@ -60,7 +60,7 @@ void main() {
         timeout: const Duration(seconds: 90),
       );
       await _scrollToText(tester, '回数');
-      await waitForText(tester, '${d2nSentinelReps}回');
+      await waitForText(tester, '$d2nSentinelReps回');
       expectHealthyFrame(tester);
       await binding.takeScreenshot('D2N_03_input_restored_after_restart');
 
