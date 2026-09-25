@@ -6,6 +6,8 @@ APP_DIR="${1:-$ROOT/app}"
 D1_DEVICE_FILE="${TASK20_D1_DEVICE_FILE:-$APP_DIR/build/task20_d1_ios_launch_smoke/selected_devices.tsv}"
 LOG_DIR="${TASK20_D2N_LOG_DIR:-$APP_DIR/build/task20_d2n_workout_input_interruption}"
 TRIGGER_TIMEOUT_SECONDS="${TASK20_D2N_TRIGGER_TIMEOUT_SECONDS:-1200}"
+TRIGGER_DRIVE_TIMEOUT_SECONDS="${TASK20_D2N_TRIGGER_DRIVE_TIMEOUT_SECONDS:-900}"
+TRIGGER_MAX_STARTUP_ATTEMPTS="${TASK20_D2N_TRIGGER_MAX_STARTUP_ATTEMPTS:-2}"
 VERIFY_TIMEOUT_SECONDS="${TASK20_D2N_VERIFY_TIMEOUT_SECONDS:-900}"
 VERIFY_MAX_STARTUP_ATTEMPTS="${TASK20_D2N_VERIFY_MAX_STARTUP_ATTEMPTS:-2}"
 APP_BUNDLE="$APP_DIR/build/ios/iphonesimulator/Runner.app"
@@ -120,22 +122,91 @@ capture_host_screenshot() {
   return 1
 }
 
-set_stage "simulator_boot"
-xcrun simctl shutdown "$udid" >/dev/null 2>&1 || true
-xcrun simctl erase "$udid"
-xcrun simctl boot "$udid"
-xcrun simctl bootstatus "$udid" -b
-
 set_stage "trigger_launch"
-(
-  cd "$APP_DIR"
-  TASK20_D2_SCREENSHOT_DIR="$screenshot_dir"     flutter drive       --keep-app-running       --no-dds       --driver=test_driver/task20_d2e_driver.dart       --target=integration_test/task20_d2n_workout_input_trigger_test.dart       -d "$udid"
-) >"$trigger_log" 2>&1 &
-trigger_pid="$!"
+trigger_successful_attempt=0
+trigger_active_log=""
+for trigger_attempt in $(seq 1 "$TRIGGER_MAX_STARTUP_ATTEMPTS"); do
+  trigger_attempt_log="$LOG_DIR/trigger_flutter_drive_attempt_$trigger_attempt.log"
+  trigger_attempt_result="$LOG_DIR/trigger_flutter_drive_attempt_$trigger_attempt.json"
+
+  if [[ "$trigger_attempt" -eq 1 ]]; then
+    xcrun simctl shutdown "$udid" >/dev/null 2>&1 || true
+    xcrun simctl erase "$udid"
+    xcrun simctl boot "$udid"
+    xcrun simctl bootstatus "$udid" -b
+  else
+    # Retry only when the prior attempt never entered D2N and the log proves a
+    # Flutter debug-attach/startup failure. Keep CoreSimulator warm while
+    # clearing app-local state before retrying.
+    xcrun simctl boot "$udid" >/dev/null 2>&1 || true
+    xcrun simctl bootstatus "$udid" -b
+    xcrun simctl terminate "$udid" "$BUNDLE_ID" >/dev/null 2>&1 || true
+    xcrun simctl uninstall "$udid" "$BUNDLE_ID" >/dev/null 2>&1 || true
+    xcrun simctl keychain "$udid" reset
+    xcrun simctl privacy "$udid" reset all "$BUNDLE_ID" >/dev/null 2>&1 || true
+  fi
+
+  (
+    cd "$APP_DIR"
+    TASK20_D2_SCREENSHOT_DIR="$screenshot_dir" \
+      python3 "$ROOT/tools/task20_d2a_run_with_timeout.py" \
+        --timeout-seconds "$TRIGGER_DRIVE_TIMEOUT_SECONDS" \
+        --log-file "$trigger_attempt_log" \
+        --result-file "$trigger_attempt_result" \
+        -- \
+        flutter drive \
+          --keep-app-running \
+          --no-dds \
+          --driver=test_driver/task20_d2e_driver.dart \
+          --target=integration_test/task20_d2n_workout_input_trigger_test.dart \
+          -d "$udid"
+  ) &
+  trigger_pid="$!"
+
+  set +e
+  wait_for_marker "$trigger_attempt_log" 'D2N_READY_FOR_OS_TERMINATION' "$TRIGGER_TIMEOUT_SECONDS"
+  marker_code="$?"
+  set -e
+
+  if [[ "$marker_code" -eq 0 ]]; then
+    trigger_successful_attempt="$trigger_attempt"
+    trigger_active_log="$trigger_attempt_log"
+    break
+  fi
+
+  if kill -0 "$trigger_pid" >/dev/null 2>&1; then
+    kill "$trigger_pid" >/dev/null 2>&1 || true
+  fi
+  set +e
+  wait "$trigger_pid"
+  set -e
+  trigger_pid=""
+
+  trigger_retryable_startup_failure=false
+  if [[ -z "$(find "$screenshot_dir" -type f -name 'D2N_*.png' -print -quit)" ]] && \
+    grep -Eqi \
+      'Application failed to start|Error waiting for a debug connection|log reader failed unexpectedly|Unable to launch|Failed to start' \
+      "$trigger_attempt_log"; then
+    trigger_retryable_startup_failure=true
+  fi
+
+  if [[ "$trigger_retryable_startup_failure" == true && "$trigger_attempt" -lt "$TRIGGER_MAX_STARTUP_ATTEMPTS" ]]; then
+    echo "Task 20-D2N trigger startup infrastructure failure; retrying warm with no accepted D2N evidence."
+    continue
+  fi
+
+  cp "$trigger_attempt_log" "$trigger_log"
+  exit 1
+done
+
+if [[ "$trigger_successful_attempt" -eq 0 || -z "$trigger_active_log" ]]; then
+  echo "ERROR: D2N trigger never reached the acceptance marker." >&2
+  exit 1
+fi
+printf '%s\n' "$trigger_successful_attempt" > "$LOG_DIR/trigger_successful_attempt.txt"
 
 set_stage "input_draft_ready"
-wait_for_marker "$trigger_log" 'D2N_READY_FOR_OS_TERMINATION' "$TRIGGER_TIMEOUT_SECONDS"
-grep -Fq 'D2N_TRIGGER_METADATA=' "$trigger_log"
+grep -Fq 'D2N_TRIGGER_METADATA=' "$trigger_active_log"
 capture_host_screenshot 'D2N_01_input_saved_before_termination.png'
 
 set_stage "os_termination"
@@ -158,6 +229,7 @@ trigger_exit_code="$?"
 set -e
 trigger_pid=""
 printf '%s\n' "$trigger_exit_code" > "$LOG_DIR/trigger_exit_code.txt"
+cp "$trigger_active_log" "$trigger_log"
 
 set_stage "restart_verification"
 xcrun simctl bootstatus "$udid" -b
