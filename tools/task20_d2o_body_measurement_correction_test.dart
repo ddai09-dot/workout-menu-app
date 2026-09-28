@@ -28,6 +28,19 @@ Future<void> _waitForRecordsDashboard(WidgetTester tester) async {
   throw TestFailure('D2O records dashboard did not become ready.');
 }
 
+Future<void> _waitForTextToDisappear(
+  WidgetTester tester,
+  String text, {
+  Duration timeout = const Duration(seconds: 10),
+}) async {
+  final deadline = DateTime.now().add(timeout);
+  while (DateTime.now().isBefore(deadline)) {
+    await tester.pump(const Duration(milliseconds: 250));
+    if (find.text(text).evaluate().isEmpty) return;
+  }
+  throw TestFailure('D2O timed out waiting for text to disappear: $text');
+}
+
 void main() {
   final binding = IntegrationTestWidgetsFlutterBinding.ensureInitialized();
 
@@ -100,6 +113,11 @@ void main() {
       await tester.enterText(fields.at(1), '19.1');
       FocusManager.instance.primaryFocus?.unfocus();
       await tester.pump(const Duration(milliseconds: 500));
+      // The snackbar from the initial save overlays the correction sheet's
+      // bottom action. Wait until it has actually left the hit-test surface
+      // before tapping the correction save button.
+      await _waitForTextToDisappear(tester, '測定を保存しました。');
+      expect(find.text('保存する').hitTestable(), findsOneWidget);
       await tapText(tester, '保存する');
       await waitForText(tester, '測定を保存しました。');
       await scrollToTextD2F(tester, '66.2kg・19.1%', delta: 250);
